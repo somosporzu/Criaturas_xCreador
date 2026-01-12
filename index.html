@@ -1,0 +1,408 @@
+import React, { useState } from 'react';
+
+const CreatureCreator = () => {
+  const [name, setName] = useState('');
+  const [nd, setND] = useState('1');
+  const [size, setSize] = useState('mediano');
+  const [category, setCategory] = useState('bestias');
+  const [tag, setTag] = useState('');
+  const [concept, setConcept] = useState('');
+  const [nature, setNature] = useState('');
+  const [description, setDescription] = useState('');
+  const [selectedTraits, setSelectedTraits] = useState([]);
+  const [notification, setNotification] = useState(null);
+  const [openCategory, setOpenCategory] = useState(null);
+
+  const ndStats = {
+    '1/8': { resistencia: 4, defensa: 7, atributos: 0, danoBase: '1d6-3', pr: 0 },
+    '1/4': { resistencia: 7, defensa: 8, atributos: 0, danoBase: '1d6-2', pr: 1 },
+    '1/2': { resistencia: 12, defensa: 8, atributos: 1, danoBase: '1d6-1', pr: 1 },
+    '1': { resistencia: 17, defensa: 8, atributos: 2, danoBase: '1d6', pr: 2 },
+    '2': { resistencia: 27, defensa: 8, atributos: 3, danoBase: '1d6+1', pr: 3 },
+    '3': { resistencia: 37, defensa: 9, atributos: 4, danoBase: '2d6-1', pr: 4 },
+    '4': { resistencia: 52, defensa: 9, atributos: 4, danoBase: '2d6', pr: 5 },
+    '5': { resistencia: 67, defensa: 10, atributos: 5, danoBase: '2d6+1', pr: 6 },
+    '6': { resistencia: 72, defensa: 10, atributos: 5, danoBase: '2d6+2', pr: 7 },
+    '7': { resistencia: 82, defensa: 11, atributos: 6, danoBase: '2d6+2', pr: 8 },
+    '8': { resistencia: 92, defensa: 11, atributos: 6, danoBase: '2d6+3', pr: 9 },
+    '9': { resistencia: 102, defensa: 12, atributos: 7, danoBase: '3d6', pr: 10 },
+    '10': { resistencia: 112, defensa: 12, atributos: 7, danoBase: '3d6+1', pr: 10 },
+    '11': { resistencia: 122, defensa: 12, atributos: 7, danoBase: '3d6+1', pr: 11 },
+    '12': { resistencia: 132, defensa: 13, atributos: 8, danoBase: '3d6+2', pr: 11 },
+    '13': { resistencia: 142, defensa: 13, atributos: 8, danoBase: '4d6', pr: 12 },
+    '14': { resistencia: 152, defensa: 14, atributos: 9, danoBase: '4d6+1', pr: 13 },
+    '15': { resistencia: 162, defensa: 14, atributos: 9, danoBase: '4d6+2', pr: 14 }
+  };
+
+  const sizeModifiers = {
+    minusculo: { resistencia: -5, defensa: 3, label: 'Minúsculo' },
+    pequeno: { resistencia: -5, defensa: 1, label: 'Pequeño' },
+    mediano: { resistencia: 0, defensa: 0, label: 'Mediano' },
+    grande: { resistencia: 15, defensa: -1, label: 'Grande' },
+    enorme: { resistencia: 30, defensa: -2, label: 'Enorme' },
+    colosal: { resistencia: 60, defensa: -4, label: 'Colosal' }
+  };
+
+  const traits = {
+    'Atributos y Vitalidad': [
+      { name: 'Deficiencia de Atributo', cost: -1, desc: 'Reduce en -1 un Atributo Primario' },
+      { name: 'Mejora de Atributo', cost: 2, desc: 'Aumenta en +1 un Atributo Primario' },
+      { name: 'Versatilidad Conceptual', cost: 2, desc: 'Aprende un nuevo Concepto' },
+      { name: 'Versatilidad de Carácter', cost: 1, desc: 'Aprende una nueva Naturaleza' },
+      { name: 'Vitalidad Aumentada', cost: 1, desc: '+10 Resistencia máxima' }
+    ],
+    'Ofensivos': [
+      { name: 'Alcance Mejorado', cost: 1, desc: 'Alcance +3m' },
+      { name: 'Ataque Adicional', cost: 1, desc: 'Segundo ataque sin bono' },
+      { name: 'Ataque Poderoso', cost: 1, desc: '-2 ataque, +3 daño' },
+      { name: 'Carga Imparable', cost: 1, desc: '+1d6 tras 5m rectos' },
+      { name: 'Crítico Mejorado', cost: 2, desc: 'Crítico con 5-6' },
+      { name: 'Drenaje', cost: 3, desc: 'Recupera daño como resistencia' },
+      { name: 'Furia', cost: 2, desc: '+1d6 con ≤50% Resistencia' },
+      { name: 'Sangrado', cost: 1, desc: 'Objetivo sufre 1d6 en turno' }
+    ],
+    'Defensivos': [
+      { name: 'Armadura Natural', cost: 1, desc: '+1 Defensa' },
+      { name: 'Corazón Doble', cost: 3, desc: 'A 0 queda con mitad' },
+      { name: 'Escurridizo', cost: 1, desc: 'Sin ataques de oportunidad' },
+      { name: 'Inmune', cost: 2, desc: 'Inmune a tipo de daño' },
+      { name: 'Piel Gruesa', cost: 1, desc: 'Ignora 1 daño' },
+      { name: 'Regeneración Mayor', cost: 2, desc: 'Recupera 5 al inicio' },
+      { name: 'Resistente', cost: 1, desc: 'Resistencia a daño' },
+      { name: 'Vulnerable', cost: -2, desc: 'Vulnerable a daño' }
+    ],
+    'Movilidad': [
+      { name: 'Anfibio', cost: 1, desc: 'Respira aire y agua' },
+      { name: 'Iniciativa Mejorada', cost: 1, desc: '+3 iniciativa' },
+      { name: 'Movimiento Especial', cost: 1, desc: 'Nadar/Trepar/Excavar' },
+      { name: 'Pies Ligeros', cost: 1, desc: 'Ignora terreno difícil' },
+      { name: 'Velocidad Mejorada', cost: 1, desc: '+3m velocidad' },
+      { name: 'Vuelo', cost: 2, desc: 'Velocidad de vuelo' }
+    ],
+    'Aura y Percepción': [
+      { name: 'Aura de Miedo', cost: 3, desc: 'Asustado a 5m' },
+      { name: 'Sentido Ciego', cost: 2, desc: 'Ve sin ojos 10m' },
+      { name: 'Sentidos Agudos', cost: 1, desc: 'Ventaja en percepción' },
+      { name: 'Visión en Oscuridad', cost: 1, desc: 'Ve en oscuridad' }
+    ],
+    'Control y Únicos': [
+      { name: 'Jefe Solitario', cost: 3, desc: 'Acción Rápida extra' },
+      { name: 'Resistencia Legendaria', cost: 2, desc: 'Supera 1 Salvación' }
+    ]
+  };
+
+  const addTrait = (trait) => {
+    setSelectedTraits([...selectedTraits, { ...trait, id: Date.now() }]);
+  };
+
+  const removeTrait = (id) => {
+    setSelectedTraits(selectedTraits.filter(t => t.id !== id));
+  };
+
+  const calculateStats = () => {
+    const baseStats = ndStats[nd];
+    const sizeMods = sizeModifiers[size];
+    const traitPR = selectedTraits.reduce((sum, t) => sum + t.cost, 0);
+    
+    return {
+      resistencia: baseStats.resistencia + sizeMods.resistencia,
+      defensa: baseStats.defensa + sizeMods.defensa,
+      atributos: baseStats.atributos,
+      danoBase: baseStats.danoBase,
+      prBase: baseStats.pr,
+      prUsed: traitPR,
+      prRemaining: baseStats.pr - traitPR
+    };
+  };
+
+  const exportAsText = () => {
+    const stats = calculateStats();
+    let text = '═══════════════════════════════════════\n';
+    text += '   CRIATURA: ' + name.toUpperCase() + '\n';
+    text += '═══════════════════════════════════════\n\n';
+    
+    if (description) text += description + '\n\n';
+    
+    text += 'ND: ' + nd + ' | Tamaño: ' + sizeModifiers[size].label + '\n';
+    text += 'Categoría: ' + category.charAt(0).toUpperCase() + category.slice(1);
+    if (tag) text += ' (' + tag + ')';
+    text += '\n\n';
+    
+    text += '───────────────────────────────────────\n';
+    text += 'ESTADÍSTICAS\n';
+    text += '───────────────────────────────────────\n';
+    text += 'Resistencia: ' + stats.resistencia + '\n';
+    text += 'Defensa: ' + stats.defensa + '\n';
+    text += 'Atributos Base: +' + stats.atributos + '\n';
+    text += 'Daño Base: ' + stats.danoBase + '\n\n';
+    
+    text += 'Concepto: ' + (concept || category) + '\n';
+    text += 'Naturaleza: ' + (nature || 'No asignado') + '\n\n';
+    
+    text += '───────────────────────────────────────\n';
+    text += 'RASGOS (' + selectedTraits.length + ')\n';
+    text += '───────────────────────────────────────\n\n';
+    
+    selectedTraits.forEach(trait => {
+      const sign = trait.cost > 0 ? '+' : '';
+      text += '◆ ' + trait.name + ' (' + sign + trait.cost + ' PR)\n';
+      text += '  ' + trait.desc + '\n\n';
+    });
+    
+    text += '───────────────────────────────────────\n';
+    text += 'PR: ' + stats.prUsed + '/' + stats.prBase + ' | Restante: ' + stats.prRemaining + '\n';
+    text += '═══════════════════════════════════════\n';
+    
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name.replace(/\s+/g, '_') + '_criatura.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    setNotification('✅ Archivo de texto descargado');
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const stats = calculateStats();
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-red-900 to-slate-900 p-4">
+      {notification && (
+        <div className="fixed top-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50">
+          {notification}
+        </div>
+      )}
+      
+      <div className="max-w-7xl mx-auto">
+        <header className="text-center mb-8 pt-6">
+          <h1 className="text-5xl font-bold text-red-400 mb-2">Creador de Criaturas</h1>
+          <p className="text-slate-300 text-lg">Sistema modular por Nivel de Desafío</p>
+        </header>
+
+        <div className="grid lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <div className="bg-slate-800 rounded-lg shadow-xl p-6 border-2 border-red-600">
+              <h2 className="text-2xl font-bold text-red-400 mb-4">Información Básica</h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-slate-300 mb-2 font-semibold">Nombre *</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Ej: Dragón Rojo"
+                    className="w-full px-4 py-2 bg-slate-700 text-white rounded border-2 border-slate-600 focus:border-red-500 outline-none"
+                  />
+                </div>
+
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-slate-300 mb-2 font-semibold">ND *</label>
+                    <select
+                      value={nd}
+                      onChange={(e) => setND(e.target.value)}
+                      className="w-full px-4 py-2 bg-slate-700 text-white rounded border-2 border-slate-600 focus:border-red-500 outline-none"
+                    >
+                      {Object.keys(ndStats).map(level => (
+                        <option key={level} value={level}>ND {level}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-slate-300 mb-2 font-semibold">Tamaño *</label>
+                    <select
+                      value={size}
+                      onChange={(e) => setSize(e.target.value)}
+                      className="w-full px-4 py-2 bg-slate-700 text-white rounded border-2 border-slate-600 focus:border-red-500 outline-none"
+                    >
+                      {Object.keys(sizeModifiers).map(s => (
+                        <option key={s} value={s}>{sizeModifiers[s].label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-slate-300 mb-2 font-semibold">Categoría *</label>
+                    <select
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      className="w-full px-4 py-2 bg-slate-700 text-white rounded border-2 border-slate-600 focus:border-red-500 outline-none"
+                    >
+                      <option value="bestias">Bestias</option>
+                      <option value="monstruos">Monstruos</option>
+                      <option value="espiritus">Espíritus</option>
+                      <option value="exaltados">Exaltados</option>
+                      <option value="corruptos">Corruptos</option>
+                      <option value="elementales">Elementales</option>
+                      <option value="artificiales">Artificiales</option>
+                      <option value="npc">NPC</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 mb-2 font-semibold">Etiqueta</label>
+                  <input
+                    type="text"
+                    value={tag}
+                    onChange={(e) => setTag(e.target.value)}
+                    placeholder="Ej: Insecto, Dragón"
+                    className="w-full px-4 py-2 bg-slate-700 text-white rounded border-2 border-slate-600 focus:border-red-500 outline-none"
+                  />
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-slate-300 mb-2 font-semibold">Concepto</label>
+                    <input
+                      type="text"
+                      value={concept}
+                      onChange={(e) => setConcept(e.target.value)}
+                      placeholder="Por defecto: categoría"
+                      className="w-full px-4 py-2 bg-slate-700 text-white rounded border-2 border-slate-600 focus:border-red-500 outline-none"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-slate-300 mb-2 font-semibold">Naturaleza</label>
+                    <input
+                      type="text"
+                      value={nature}
+                      onChange={(e) => setNature(e.target.value)}
+                      placeholder="Ej: Agresivamente"
+                      className="w-full px-4 py-2 bg-slate-700 text-white rounded border-2 border-slate-600 focus:border-red-500 outline-none"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-slate-300 mb-2 font-semibold">Descripción</label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Describe la criatura..."
+                    rows="2"
+                    className="w-full px-4 py-2 bg-slate-700 text-white rounded border-2 border-slate-600 focus:border-red-500 outline-none resize-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-800 rounded-lg shadow-xl p-6 border-2 border-purple-600">
+              <h2 className="text-2xl font-bold text-purple-400 mb-4">Biblioteca de Rasgos</h2>
+              
+              <div className="space-y-2">
+                {Object.entries(traits).map(([catName, catTraits]) => (
+                  <div key={catName} className="border border-slate-700 rounded-lg overflow-hidden">
+                    <button
+                      onClick={() => setOpenCategory(openCategory === catName ? null : catName)}
+                      className="w-full px-4 py-3 bg-slate-700 hover:bg-slate-600 text-left font-semibold text-white flex justify-between items-center transition-colors"
+                    >
+                      <span>{catName}</span>
+                      <span className="text-xl">{openCategory === catName ? '−' : '+'}</span>
+                    </button>
+                    
+                    {openCategory === catName && (
+                      <div className="p-3 bg-slate-750 space-y-2 max-h-80 overflow-y-auto">
+                        {catTraits.map((trait, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => addTrait(trait)}
+                            className="w-full text-left p-3 bg-slate-700 hover:bg-purple-900 rounded border border-purple-600 transition-colors"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <div className="font-semibold text-purple-200">{trait.name}</div>
+                                <div className="text-sm text-slate-400 mt-1">{trait.desc}</div>
+                              </div>
+                              <div className="ml-2 text-purple-300 font-bold">
+                                {trait.cost > 0 ? '+' : ''}{trait.cost}
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="bg-slate-800 rounded-lg shadow-xl p-6 border-2 border-blue-600 sticky top-4">
+              <h2 className="text-2xl font-bold text-blue-400 mb-4">Estadísticas</h2>
+              
+              <div className="space-y-3 mb-4">
+                <div className="p-3 bg-slate-700 rounded">
+                  <div className="text-slate-400 text-sm">Resistencia</div>
+                  <div className="text-2xl font-bold text-white">{stats.resistencia}</div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-slate-700 rounded">
+                    <div className="text-slate-400 text-sm">Defensa</div>
+                    <div className="text-xl font-bold text-white">{stats.defensa}</div>
+                  </div>
+                  <div className="p-3 bg-slate-700 rounded">
+                    <div className="text-slate-400 text-sm">Atributos</div>
+                    <div className="text-xl font-bold text-white">+{stats.atributos}</div>
+                  </div>
+                </div>
+                
+                <div className="p-3 bg-slate-700 rounded">
+                  <div className="text-slate-400 text-sm">Daño Base</div>
+                  <div className="text-xl font-bold text-white">{stats.danoBase}</div>
+                </div>
+                
+                <div className="p-3 rounded" style={{backgroundColor: stats.prRemaining >= 0 ? '#1e4d2b' : '#4d1e1e'}}>
+                  <div className="text-slate-300 text-sm">Puntos de Rasgo</div>
+                  <div className="text-2xl font-bold text-white">
+                    {stats.prUsed} / {stats.prBase}
+                  </div>
+                  <div className="text-sm mt-1" style={{color: stats.prRemaining >= 0 ? '#4ade80' : '#f87171'}}>
+                    Restantes: {stats.prRemaining}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
+                {selectedTraits.map(trait => (
+                  <div key={trait.id} className="p-3 bg-slate-700 rounded">
+                    <div className="flex justify-between items-start mb-1">
+                      <div className="font-semibold text-white text-sm">{trait.name}</div>
+                      <button
+                        onClick={() => removeTrait(trait.id)}
+                        className="text-red-400 hover:text-red-300 ml-2"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="text-xs text-slate-400">{trait.desc}</div>
+                    <div className="text-xs mt-1" style={{color: trait.cost > 0 ? '#4ade80' : '#f87171'}}>
+                      {trait.cost > 0 ? '+' : ''}{trait.cost} PR
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={exportAsText}
+                disabled={!name}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded font-semibold transition-colors"
+              >
+                📄 Exportar como Texto
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default CreatureCreator;
