@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Creador de Criaturas - Sistema PAPA</title>
-    <meta name="description" content="Herramienta web para crear criaturas equilibradas usando el sistema modular de Nivel de Desafío (ND)">
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -32,6 +31,9 @@
           const [auraMod, setAuraMod] = useState(0);
           const [equipment, setEquipment] = useState([]);
           const [openEquipmentCategory, setOpenEquipmentCategory] = useState(null);
+          const [customActions, setCustomActions] = useState([
+            { id: 1, name: 'Dientes y Garras', damage: 'ND', type: 'Contundente', properties: 'Ataque natural', isNatural: true }
+          ]);
 
           const ndStats = {
             '1/8': { resistencia: 4, defensa: 7, atributos: 0, danoBase: '1d6-3', pr: 0 },
@@ -186,6 +188,27 @@
             setEquipment(equipment.filter(e => e.id !== id));
           };
 
+          const addCustomAction = () => {
+            setCustomActions([...customActions, { 
+              id: Date.now(), 
+              name: '', 
+              damage: '', 
+              type: 'Contundente', 
+              properties: '',
+              isNatural: false
+            }]);
+          };
+
+          const updateCustomAction = (id, field, value) => {
+            setCustomActions(customActions.map(action => 
+              action.id === id ? { ...action, [field]: value } : action
+            ));
+          };
+
+          const removeCustomAction = (id) => {
+            setCustomActions(customActions.filter(action => action.id !== id));
+          };
+
           const calculateStats = () => {
             const baseStats = ndStats[nd];
             const sizeMods = sizeModifiers[size];
@@ -228,7 +251,7 @@
             const stats = calculateStats();
             const selectedArmor = equipment.find(e => e.type === 'armor');
             const selectedShield = equipment.find(e => e.type === 'shield');
-            const weapons = equipment.filter(e => e.type === 'weapon');
+            const weaponEquipment = equipment.filter(e => e.type === 'weapon');
             
             let text = '#' + name.toUpperCase() + '\n';
             text += category.charAt(0).toUpperCase() + category.slice(1);
@@ -249,11 +272,11 @@
               text += '## Descripción\n' + description + '\n\n';
             }
             
-            if (selectedArmor || selectedShield || weapons.length > 0) {
+            if (selectedArmor || selectedShield || weaponEquipment.length > 0) {
               text += '## Equipo\n';
               if (selectedArmor) text += '- ' + selectedArmor.name + ' (Bono: +' + selectedArmor.bonus + ', ' + selectedArmor.properties + ')\n';
               if (selectedShield) text += '- ' + selectedShield.name + ' (Bono: +' + selectedShield.bonus + ', ' + selectedShield.properties + ')\n';
-              weapons.forEach(w => {
+              weaponEquipment.forEach(w => {
                 text += '- ' + w.name + ' (Daño: ' + w.damage + ' ' + w.type + ', ' + w.properties + ')\n';
               });
               text += '\n';
@@ -269,9 +292,30 @@
               text += '\n';
             }
             
-            if (weapons.length > 0) {
+            if (customActions.length > 0 || weaponEquipment.length > 0) {
               text += '## Acciones\n';
-              weapons.forEach(w => {
+              
+              customActions.forEach(action => {
+                if (action.name) {
+                  let actionDamage = action.damage;
+                  let attackBonus = stats.cuerpo;
+                  
+                  if (action.damage === 'ND') {
+                    actionDamage = stats.danoBase;
+                  }
+                  
+                  text += '**' + action.name + ':** Bono de Ataque +' + attackBonus;
+                  text += ', Daño ' + actionDamage;
+                  if (attackBonus !== 0 && !actionDamage.includes('+') && !actionDamage.includes('-')) {
+                    text += (attackBonus > 0 ? '+' : '') + attackBonus;
+                  }
+                  text += ' ' + action.type;
+                  if (action.properties) text += ' (' + action.properties + ')';
+                  text += '\n';
+                }
+              });
+              
+              weaponEquipment.forEach(w => {
                 const weaponAttr = w.properties.includes('Ligera') ? stats.destreza : stats.cuerpo;
                 const attackBonus = weaponAttr;
                 text += '**' + w.name + ':** Bono de Ataque +' + attackBonus;
@@ -302,43 +346,44 @@
           const stats = calculateStats();
 
           return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-900 via-red-900 to-slate-900 p-4">
+            <div className="min-h-screen bg-gradient-to-br from-stone-900 via-green-900 to-stone-900 p-4">
               {notification && (
-                <div className="fixed top-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50">
+                <div className="fixed top-4 right-4 bg-green-700 text-stone-100 px-6 py-3 rounded-lg shadow-lg z-50 border-2 border-green-500">
                   {notification}
                 </div>
               )}
               
               <div className="max-w-7xl mx-auto">
                 <header className="text-center mb-8 pt-6">
-                  <h1 className="text-5xl font-bold text-red-400 mb-2">Creador de Criaturas</h1>
-                  <p className="text-slate-300 text-lg">Sistema modular por Nivel de Desafío</p>
+                  <h1 className="text-5xl font-bold text-green-400 mb-2">Creador de Criaturas</h1>
+                  <p className="text-stone-300 text-lg">Sistema PAPA - Nivel de Desafío</p>
                 </header>
 
                 <div className="grid lg:grid-cols-3 gap-6">
                   <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-slate-800 rounded-lg shadow-xl p-6 border-2 border-red-600">
-                      <h2 className="text-2xl font-bold text-red-400 mb-4">Información Básica</h2>
+                    {/* INFO BÁSICA */}
+                    <div className="bg-stone-800 rounded-lg shadow-xl p-6 border-2 border-green-600">
+                      <h2 className="text-2xl font-bold text-green-400 mb-4">Información Básica</h2>
                       
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-slate-300 mb-2 font-semibold">Nombre *</label>
+                          <label className="block text-stone-300 mb-2 font-semibold">Nombre *</label>
                           <input
                             type="text"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
-                            placeholder="Ej: Dragón Rojo"
-                            className="w-full px-4 py-2 bg-slate-700 text-white rounded border-2 border-slate-600 focus:border-red-500 outline-none"
+                            placeholder="Ej: Lobo Salvaje"
+                            className="w-full px-4 py-2 bg-stone-700 text-stone-100 rounded border-2 border-stone-600 focus:border-green-500 outline-none"
                           />
                         </div>
 
                         <div className="grid md:grid-cols-3 gap-4">
                           <div>
-                            <label className="block text-slate-300 mb-2 font-semibold">ND *</label>
+                            <label className="block text-stone-300 mb-2 font-semibold">ND *</label>
                             <select
                               value={nd}
                               onChange={(e) => setND(e.target.value)}
-                              className="w-full px-4 py-2 bg-slate-700 text-white rounded border-2 border-slate-600 focus:border-red-500 outline-none"
+                              className="w-full px-4 py-2 bg-stone-700 text-stone-100 rounded border-2 border-stone-600 focus:border-green-500 outline-none"
                             >
                               {Object.keys(ndStats).map(level => (
                                 <option key={level} value={level}>ND {level}</option>
@@ -347,11 +392,11 @@
                           </div>
                           
                           <div>
-                            <label className="block text-slate-300 mb-2 font-semibold">Tamaño *</label>
+                            <label className="block text-stone-300 mb-2 font-semibold">Tamaño *</label>
                             <select
                               value={size}
                               onChange={(e) => setSize(e.target.value)}
-                              className="w-full px-4 py-2 bg-slate-700 text-white rounded border-2 border-slate-600 focus:border-red-500 outline-none"
+                              className="w-full px-4 py-2 bg-stone-700 text-stone-100 rounded border-2 border-stone-600 focus:border-green-500 outline-none"
                             >
                               {Object.keys(sizeModifiers).map(s => (
                                 <option key={s} value={s}>{sizeModifiers[s].label}</option>
@@ -360,11 +405,11 @@
                           </div>
                           
                           <div>
-                            <label className="block text-slate-300 mb-2 font-semibold">Categoría *</label>
+                            <label className="block text-stone-300 mb-2 font-semibold">Categoría *</label>
                             <select
                               value={category}
                               onChange={(e) => setCategory(e.target.value)}
-                              className="w-full px-4 py-2 bg-slate-700 text-white rounded border-2 border-slate-600 focus:border-red-500 outline-none"
+                              className="w-full px-4 py-2 bg-stone-700 text-stone-100 rounded border-2 border-stone-600 focus:border-green-500 outline-none"
                             >
                               <option value="bestias">Bestias</option>
                               <option value="monstruos">Monstruos</option>
@@ -379,34 +424,34 @@
                         </div>
 
                         <div>
-                          <label className="block text-slate-300 mb-2 font-semibold">Etiqueta</label>
+                          <label className="block text-stone-300 mb-2 font-semibold">Etiqueta</label>
                           <input
                             type="text"
                             value={tag}
                             onChange={(e) => setTag(e.target.value)}
                             placeholder="Ej: Insecto, Dragón"
-                            className="w-full px-4 py-2 bg-slate-700 text-white rounded border-2 border-slate-600 focus:border-red-500 outline-none"
+                            className="w-full px-4 py-2 bg-stone-700 text-stone-100 rounded border-2 border-stone-600 focus:border-green-500 outline-none"
                           />
                         </div>
 
                         <div className="grid md:grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-slate-300 mb-2 font-semibold">Concepto</label>
+                            <label className="block text-stone-300 mb-2 font-semibold">Concepto</label>
                             <input
                               type="text"
                               value={concept}
                               onChange={(e) => setConcept(e.target.value)}
                               placeholder="Por defecto: categoría"
-                              className="w-full px-4 py-2 bg-slate-700 text-white rounded border-2 border-slate-600 focus:border-red-500 outline-none"
+                              className="w-full px-4 py-2 bg-stone-700 text-stone-100 rounded border-2 border-stone-600 focus:border-green-500 outline-none"
                             />
                           </div>
                           
                           <div>
-                            <label className="block text-slate-300 mb-2 font-semibold">Naturaleza</label>
+                            <label className="block text-stone-300 mb-2 font-semibold">Naturaleza</label>
                             <select
                               value={nature}
                               onChange={(e) => setNature(e.target.value)}
-                              className="w-full px-4 py-2 bg-slate-700 text-white rounded border-2 border-slate-600 focus:border-red-500 outline-none"
+                              className="w-full px-4 py-2 bg-stone-700 text-stone-100 rounded border-2 border-stone-600 focus:border-green-500 outline-none"
                             >
                               <option value="">Seleccionar...</option>
                               {naturalezas.map(nat => (
@@ -417,42 +462,125 @@
                         </div>
                         
                         <div>
-                          <label className="block text-slate-300 mb-2 font-semibold">Descripción</label>
+                          <label className="block text-stone-300 mb-2 font-semibold">Descripción</label>
                           <textarea
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             placeholder="Describe la criatura..."
                             rows="2"
-                            className="w-full px-4 py-2 bg-slate-700 text-white rounded border-2 border-slate-600 focus:border-red-500 outline-none resize-none"
+                            className="w-full px-4 py-2 bg-stone-700 text-stone-100 rounded border-2 border-stone-600 focus:border-green-500 outline-none resize-none"
                           />
                         </div>
                       </div>
                     </div>
 
-                    <div className="bg-slate-800 rounded-lg shadow-xl p-6 border-2 border-green-600">
-                      <h2 className="text-2xl font-bold text-green-400 mb-4">Ajuste de Atributos</h2>
-                      <p className="text-slate-300 text-sm mb-4">
+                    {/* ACCIONES PERSONALIZADAS */}
+                    <div className="bg-stone-800 rounded-lg shadow-xl p-6 border-2 border-green-600">
+                      <h2 className="text-2xl font-bold text-green-400 mb-4">Acciones Personalizadas</h2>
+                      <p className="text-stone-300 text-sm mb-4">
+                        Define los ataques y acciones especiales de la criatura. Usa "ND" como daño para aplicar el daño base del Nivel de Desafío.
+                      </p>
+                      
+                      <div className="space-y-3 mb-4">
+                        {customActions.map(action => (
+                          <div key={action.id} className="p-3 bg-stone-700 rounded border-2 border-stone-600">
+                            <div className="grid gap-2">
+                              <div>
+                                <label className="block text-stone-300 text-xs mb-1">Nombre</label>
+                                <input
+                                  type="text"
+                                  value={action.name}
+                                  onChange={(e) => updateCustomAction(action.id, 'name', e.target.value)}
+                                  placeholder="Ej: Mordisco"
+                                  className="w-full px-2 py-1 bg-stone-600 text-stone-100 rounded border border-stone-500 focus:border-green-500 outline-none text-sm"
+                                />
+                              </div>
+                              <div className="grid grid-cols-3 gap-2">
+                                <div>
+                                  <label className="block text-stone-300 text-xs mb-1">Daño</label>
+                                  <input
+                                    type="text"
+                                    value={action.damage}
+                                    onChange={(e) => updateCustomAction(action.id, 'damage', e.target.value)}
+                                    placeholder="ND o 2d6"
+                                    className="w-full px-2 py-1 bg-stone-600 text-stone-100 rounded border border-stone-500 focus:border-green-500 outline-none text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-stone-300 text-xs mb-1">Tipo</label>
+                                  <select
+                                    value={action.type}
+                                    onChange={(e) => updateCustomAction(action.id, 'type', e.target.value)}
+                                    className="w-full px-2 py-1 bg-stone-600 text-stone-100 rounded border border-stone-500 focus:border-green-500 outline-none text-sm"
+                                  >
+                                    <option>Contundente</option>
+                                    <option>Cortante</option>
+                                    <option>Penetrante</option>
+                                    <option>Fuego</option>
+                                    <option>Hielo</option>
+                                    <option>Eléctrico</option>
+                                    <option>Corrosivo</option>
+                                  </select>
+                                </div>
+                                <div className="flex items-end">
+                                  {!action.isNatural && (
+                                    <button
+                                      onClick={() => removeCustomAction(action.id)}
+                                      className="w-full px-2 py-1 bg-red-700 hover:bg-red-800 text-stone-100 rounded text-sm"
+                                    >
+                                      ×
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-stone-300 text-xs mb-1">Propiedades</label>
+                                <input
+                                  type="text"
+                                  value={action.properties}
+                                  onChange={(e) => updateCustomAction(action.id, 'properties', e.target.value)}
+                                  placeholder="Ej: Alcance 3m, Área 5m"
+                                  className="w-full px-2 py-1 bg-stone-600 text-stone-100 rounded border border-stone-500 focus:border-green-500 outline-none text-sm"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <button
+                        onClick={addCustomAction}
+                        className="w-full py-2 bg-green-700 hover:bg-green-800 text-stone-100 rounded font-semibold transition-colors"
+                      >
+                        + Agregar Acción
+                      </button>
+                    </div>
+
+                    {/* AJUSTE DE ATRIBUTOS */}
+                    <div className="bg-stone-800 rounded-lg shadow-xl p-6 border-2 border-lime-600">
+                      <h2 className="text-2xl font-bold text-lime-400 mb-4">Ajuste de Atributos</h2>
+                      <p className="text-stone-300 text-sm mb-4">
                         Aumentar: +2 PR por punto | Disminuir: -1 PR por punto (mín. -3)
                       </p>
                       
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-slate-300 mb-2 font-semibold">
+                          <label className="block text-stone-300 mb-2 font-semibold">
                             Cuerpo (Base: +{ndStats[nd].atributos})
                           </label>
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => setCuerpoMod(Math.max(cuerpoMod - 1, -ndStats[nd].atributos - 3))}
-                              className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-bold"
+                              className="px-3 py-2 bg-red-700 hover:bg-red-800 text-stone-100 rounded font-bold"
                             >
                               −
                             </button>
-                            <div className="flex-1 text-center bg-slate-700 py-2 rounded text-white font-bold">
+                            <div className="flex-1 text-center bg-stone-700 py-2 rounded text-stone-100 font-bold">
                               {cuerpoMod >= 0 ? '+' : ''}{cuerpoMod} ({cuerpoMod * 2} PR)
                             </div>
                             <button
                               onClick={() => setCuerpoMod(cuerpoMod + 1)}
-                              className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-bold"
+                              className="px-3 py-2 bg-lime-700 hover:bg-lime-800 text-stone-100 rounded font-bold"
                             >
                               +
                             </button>
@@ -460,22 +588,22 @@
                         </div>
 
                         <div>
-                          <label className="block text-slate-300 mb-2 font-semibold">
+                          <label className="block text-stone-300 mb-2 font-semibold">
                             Destreza (Base: +{ndStats[nd].atributos})
                           </label>
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => setDestrezaMod(Math.max(destrezaMod - 1, -ndStats[nd].atributos - 3))}
-                              className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-bold"
+                              className="px-3 py-2 bg-red-700 hover:bg-red-800 text-stone-100 rounded font-bold"
                             >
                               −
                             </button>
-                            <div className="flex-1 text-center bg-slate-700 py-2 rounded text-white font-bold">
+                            <div className="flex-1 text-center bg-stone-700 py-2 rounded text-stone-100 font-bold">
                               {destrezaMod >= 0 ? '+' : ''}{destrezaMod} ({destrezaMod * 2} PR)
                             </div>
                             <button
                               onClick={() => setDestrezaMod(destrezaMod + 1)}
-                              className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-bold"
+                              className="px-3 py-2 bg-lime-700 hover:bg-lime-800 text-stone-100 rounded font-bold"
                             >
                               +
                             </button>
@@ -483,22 +611,22 @@
                         </div>
 
                         <div>
-                          <label className="block text-slate-300 mb-2 font-semibold">
+                          <label className="block text-stone-300 mb-2 font-semibold">
                             Aura (Base: +{ndStats[nd].atributos})
                           </label>
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => setAuraMod(Math.max(auraMod - 1, -ndStats[nd].atributos - 3))}
-                              className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-bold"
+                              className="px-3 py-2 bg-red-700 hover:bg-red-800 text-stone-100 rounded font-bold"
                             >
                               −
                             </button>
-                            <div className="flex-1 text-center bg-slate-700 py-2 rounded text-white font-bold">
+                            <div className="flex-1 text-center bg-stone-700 py-2 rounded text-stone-100 font-bold">
                               {auraMod >= 0 ? '+' : ''}{auraMod} ({auraMod * 2} PR)
                             </div>
                             <button
                               onClick={() => setAuraMod(auraMod + 1)}
-                              className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-bold"
+                              className="px-3 py-2 bg-lime-700 hover:bg-lime-800 text-stone-100 rounded font-bold"
                             >
                               +
                             </button>
@@ -507,32 +635,33 @@
                       </div>
                     </div>
 
-                    <div className="bg-slate-800 rounded-lg shadow-xl p-6 border-2 border-yellow-600">
-                      <h2 className="text-2xl font-bold text-yellow-400 mb-4">Equipo</h2>
+                    {/* EQUIPO */}
+                    <div className="bg-stone-800 rounded-lg shadow-xl p-6 border-2 border-amber-700">
+                      <h2 className="text-2xl font-bold text-amber-400 mb-4">Equipo</h2>
                       
                       <div className="space-y-2 mb-4">
-                        <div className="border border-slate-700 rounded-lg overflow-hidden">
+                        <div className="border border-stone-700 rounded-lg overflow-hidden">
                           <button
                             onClick={() => setOpenEquipmentCategory(openEquipmentCategory === 'weapons' ? null : 'weapons')}
-                            className="w-full px-4 py-3 bg-slate-700 hover:bg-slate-600 text-left font-semibold text-white flex justify-between items-center transition-colors"
+                            className="w-full px-4 py-3 bg-stone-700 hover:bg-stone-600 text-left font-semibold text-stone-100 flex justify-between items-center transition-colors"
                           >
                             <span>Armas</span>
                             <span className="text-xl">{openEquipmentCategory === 'weapons' ? '−' : '+'}</span>
                           </button>
                           
                           {openEquipmentCategory === 'weapons' && (
-                            <div className="p-3 bg-slate-750 space-y-2 max-h-60 overflow-y-auto">
+                            <div className="p-3 bg-stone-750 space-y-2 max-h-60 overflow-y-auto">
                               {Object.entries(weapons).map(([catName, catWeapons]) => (
                                 <div key={catName}>
-                                  <div className="text-yellow-300 font-semibold text-sm mb-1">{catName}</div>
+                                  <div className="text-amber-300 font-semibold text-sm mb-1">{catName}</div>
                                   {catWeapons.map((weapon, idx) => (
                                     <button
                                       key={idx}
                                       onClick={() => addEquipment(weapon, 'weapon')}
-                                      className="w-full text-left p-2 bg-slate-700 hover:bg-yellow-900 rounded border border-yellow-600 transition-colors text-sm mb-1"
+                                      className="w-full text-left p-2 bg-stone-700 hover:bg-amber-900 rounded border border-amber-600 transition-colors text-sm mb-1"
                                     >
-                                      <div className="font-semibold text-yellow-200">{weapon.name}</div>
-                                      <div className="text-slate-400 text-xs">{weapon.damage} {weapon.type}</div>
+                                      <div className="font-semibold text-amber-200">{weapon.name}</div>
+                                      <div className="text-stone-400 text-xs">{weapon.damage} {weapon.type}</div>
                                     </button>
                                   ))}
                                 </div>
@@ -541,17 +670,17 @@
                           )}
                         </div>
 
-                        <div className="border border-slate-700 rounded-lg overflow-hidden">
+                        <div className="border border-stone-700 rounded-lg overflow-hidden">
                           <button
                             onClick={() => setOpenEquipmentCategory(openEquipmentCategory === 'armor' ? null : 'armor')}
-                            className="w-full px-4 py-3 bg-slate-700 hover:bg-slate-600 text-left font-semibold text-white flex justify-between items-center transition-colors"
+                            className="w-full px-4 py-3 bg-stone-700 hover:bg-stone-600 text-left font-semibold text-stone-100 flex justify-between items-center transition-colors"
                           >
                             <span>Armaduras</span>
                             <span className="text-xl">{openEquipmentCategory === 'armor' ? '−' : '+'}</span>
                           </button>
                           
                           {openEquipmentCategory === 'armor' && (
-                            <div className="p-3 bg-slate-750 space-y-2 max-h-60 overflow-y-auto">
+                            <div className="p-3 bg-stone-750 space-y-2 max-h-60 overflow-y-auto">
                               {armors.map((armor, idx) => (
                                 <button
                                   key={idx}
@@ -559,27 +688,27 @@
                                     setEquipment(equipment.filter(e => e.type !== 'armor'));
                                     if (armor.bonus > 0) addEquipment(armor, 'armor');
                                   }}
-                                  className="w-full text-left p-2 bg-slate-700 hover:bg-yellow-900 rounded border border-yellow-600 transition-colors text-sm"
+                                  className="w-full text-left p-2 bg-stone-700 hover:bg-amber-900 rounded border border-amber-600 transition-colors text-sm"
                                 >
-                                  <div className="font-semibold text-yellow-200">{armor.name}</div>
-                                  <div className="text-slate-400 text-xs">Bono: +{armor.bonus}</div>
+                                  <div className="font-semibold text-amber-200">{armor.name}</div>
+                                  <div className="text-stone-400 text-xs">Bono: +{armor.bonus}</div>
                                 </button>
                               ))}
                             </div>
                           )}
                         </div>
 
-                        <div className="border border-slate-700 rounded-lg overflow-hidden">
+                        <div className="border border-stone-700 rounded-lg overflow-hidden">
                           <button
                             onClick={() => setOpenEquipmentCategory(openEquipmentCategory === 'shields' ? null : 'shields')}
-                            className="w-full px-4 py-3 bg-slate-700 hover:bg-slate-600 text-left font-semibold text-white flex justify-between items-center transition-colors"
+                            className="w-full px-4 py-3 bg-stone-700 hover:bg-stone-600 text-left font-semibold text-stone-100 flex justify-between items-center transition-colors"
                           >
                             <span>Escudos</span>
                             <span className="text-xl">{openEquipmentCategory === 'shields' ? '−' : '+'}</span>
                           </button>
                           
                           {openEquipmentCategory === 'shields' && (
-                            <div className="p-3 bg-slate-750 space-y-2 max-h-60 overflow-y-auto">
+                            <div className="p-3 bg-stone-750 space-y-2 max-h-60 overflow-y-auto">
                               {shields.map((shield, idx) => (
                                 <button
                                   key={idx}
@@ -587,10 +716,10 @@
                                     setEquipment(equipment.filter(e => e.type !== 'shield'));
                                     if (shield.bonus > 0) addEquipment(shield, 'shield');
                                   }}
-                                  className="w-full text-left p-2 bg-slate-700 hover:bg-yellow-900 rounded border border-yellow-600 transition-colors text-sm"
+                                  className="w-full text-left p-2 bg-stone-700 hover:bg-amber-900 rounded border border-amber-600 transition-colors text-sm"
                                 >
-                                  <div className="font-semibold text-yellow-200">{shield.name}</div>
-                                  <div className="text-slate-400 text-xs">Bono: +{shield.bonus}</div>
+                                  <div className="font-semibold text-amber-200">{shield.name}</div>
+                                  <div className="text-stone-400 text-xs">Bono: +{shield.bonus}</div>
                                 </button>
                               ))}
                             </div>
@@ -600,10 +729,10 @@
 
                       <div className="space-y-2">
                         {equipment.map(item => (
-                          <div key={item.id} className="p-2 bg-slate-700 rounded flex justify-between items-center">
+                          <div key={item.id} className="p-2 bg-stone-700 rounded flex justify-between items-center">
                             <div>
-                              <div className="font-semibold text-white text-sm">{item.name}</div>
-                              <div className="text-xs text-slate-400">
+                              <div className="font-semibold text-stone-100 text-sm">{item.name}</div>
+                              <div className="text-xs text-stone-400">
                                 {item.type === 'weapon' ? `${item.damage} ${item.type}` : `Bono: +${item.bonus}`}
                               </div>
                             </div>
@@ -618,34 +747,35 @@
                       </div>
                     </div>
 
-                    <div className="bg-slate-800 rounded-lg shadow-xl p-6 border-2 border-purple-600">
-                      <h2 className="text-2xl font-bold text-purple-400 mb-4">Biblioteca de Rasgos</h2>
+                    {/* BIBLIOTECA DE RASGOS */}
+                    <div className="bg-stone-800 rounded-lg shadow-xl p-6 border-2 border-emerald-600">
+                      <h2 className="text-2xl font-bold text-emerald-400 mb-4">Biblioteca de Rasgos</h2>
                       
                       <div className="space-y-2">
                         {Object.entries(traits).map(([catName, catTraits]) => (
-                          <div key={catName} className="border border-slate-700 rounded-lg overflow-hidden">
+                          <div key={catName} className="border border-stone-700 rounded-lg overflow-hidden">
                             <button
                               onClick={() => setOpenCategory(openCategory === catName ? null : catName)}
-                              className="w-full px-4 py-3 bg-slate-700 hover:bg-slate-600 text-left font-semibold text-white flex justify-between items-center transition-colors"
+                              className="w-full px-4 py-3 bg-stone-700 hover:bg-stone-600 text-left font-semibold text-stone-100 flex justify-between items-center transition-colors"
                             >
                               <span>{catName}</span>
                               <span className="text-xl">{openCategory === catName ? '−' : '+'}</span>
                             </button>
                             
                             {openCategory === catName && (
-                              <div className="p-3 bg-slate-750 space-y-2 max-h-80 overflow-y-auto">
+                              <div className="p-3 bg-stone-750 space-y-2 max-h-80 overflow-y-auto">
                                 {catTraits.map((trait, idx) => (
                                   <button
                                     key={idx}
                                     onClick={() => addTrait(trait)}
-                                    className="w-full text-left p-3 bg-slate-700 hover:bg-purple-900 rounded border border-purple-600 transition-colors"
+                                    className="w-full text-left p-3 bg-stone-700 hover:bg-emerald-900 rounded border border-emerald-600 transition-colors"
                                   >
                                     <div className="flex justify-between items-start">
                                       <div className="flex-1">
-                                        <div className="font-semibold text-purple-200">{trait.name}</div>
-                                        <div className="text-sm text-slate-400 mt-1">{trait.desc}</div>
+                                        <div className="font-semibold text-emerald-200">{trait.name}</div>
+                                        <div className="text-sm text-stone-400 mt-1">{trait.desc}</div>
                                       </div>
-                                      <div className="ml-2 text-purple-300 font-bold">
+                                      <div className="ml-2 text-emerald-300 font-bold">
                                         {trait.cost > 0 ? '+' : ''}{trait.cost}
                                       </div>
                                     </div>
@@ -659,53 +789,54 @@
                     </div>
                   </div>
 
+                  {/* PANEL LATERAL */}
                   <div className="space-y-6">
-                    <div className="bg-slate-800 rounded-lg shadow-xl p-6 border-2 border-blue-600 sticky top-4">
-                      <h2 className="text-2xl font-bold text-blue-400 mb-4">Estadísticas</h2>
+                    <div className="bg-stone-800 rounded-lg shadow-xl p-6 border-2 border-green-600 sticky top-4">
+                      <h2 className="text-2xl font-bold text-green-400 mb-4">Estadísticas</h2>
                       
                       <div className="space-y-3 mb-4">
-                        <div className="p-3 bg-slate-700 rounded">
-                          <div className="text-slate-400 text-sm">Resistencia</div>
-                          <div className="text-2xl font-bold text-white">{stats.resistencia}</div>
+                        <div className="p-3 bg-stone-700 rounded">
+                          <div className="text-stone-400 text-sm">Resistencia</div>
+                          <div className="text-2xl font-bold text-stone-100">{stats.resistencia}</div>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-3">
-                          <div className="p-3 bg-slate-700 rounded">
-                            <div className="text-slate-400 text-sm">Defensa</div>
-                            <div className="text-xl font-bold text-white">{stats.defensa}</div>
+                          <div className="p-3 bg-stone-700 rounded">
+                            <div className="text-stone-400 text-sm">Defensa</div>
+                            <div className="text-xl font-bold text-stone-100">{stats.defensa}</div>
                           </div>
-                          <div className="p-3 bg-slate-700 rounded">
-                            <div className="text-slate-400 text-sm">Iniciativa</div>
-                            <div className="text-xl font-bold text-white">{stats.iniciativa >= 0 ? '+' : ''}{stats.iniciativa}</div>
+                          <div className="p-3 bg-stone-700 rounded">
+                            <div className="text-stone-400 text-sm">Iniciativa</div>
+                            <div className="text-xl font-bold text-stone-100">{stats.iniciativa >= 0 ? '+' : ''}{stats.iniciativa}</div>
                           </div>
                         </div>
 
-                        <div className="p-3 bg-slate-700 rounded">
-                          <div className="text-slate-400 text-sm">Movimiento</div>
-                          <div className="text-xl font-bold text-white">{stats.movimiento}m</div>
+                        <div className="p-3 bg-stone-700 rounded">
+                          <div className="text-stone-400 text-sm">Movimiento</div>
+                          <div className="text-xl font-bold text-stone-100">{stats.movimiento}m</div>
                         </div>
                         
                         <div className="grid grid-cols-3 gap-2">
-                          <div className="p-2 bg-slate-700 rounded">
-                            <div className="text-slate-400 text-xs">Cuerpo</div>
-                            <div className="text-lg font-bold text-white">{stats.cuerpo >= 0 ? '+' : ''}{stats.cuerpo}</div>
+                          <div className="p-2 bg-stone-700 rounded">
+                            <div className="text-stone-400 text-xs">Cuerpo</div>
+                            <div className="text-lg font-bold text-stone-100">{stats.cuerpo >= 0 ? '+' : ''}{stats.cuerpo}</div>
                           </div>
-                          <div className="p-2 bg-slate-700 rounded">
-                            <div className="text-slate-400 text-xs">Destreza</div>
-                            <div className="text-lg font-bold text-white">{stats.destreza >= 0 ? '+' : ''}{stats.destreza}</div>
+                          <div className="p-2 bg-stone-700 rounded">
+                            <div className="text-stone-400 text-xs">Destreza</div>
+                            <div className="text-lg font-bold text-stone-100">{stats.destreza >= 0 ? '+' : ''}{stats.destreza}</div>
                           </div>
-                          <div className="p-2 bg-slate-700 rounded">
-                            <div className="text-slate-400 text-xs">Aura</div>
-                            <div className="text-lg font-bold text-white">{stats.aura >= 0 ? '+' : ''}{stats.aura}</div>
+                          <div className="p-2 bg-stone-700 rounded">
+                            <div className="text-stone-400 text-xs">Aura</div>
+                            <div className="text-lg font-bold text-stone-100">{stats.aura >= 0 ? '+' : ''}{stats.aura}</div>
                           </div>
                         </div>
                         
-                        <div className="p-3 rounded" style={{backgroundColor: stats.prRemaining >= 0 ? '#1e4d2b' : '#4d1e1e'}}>
-                          <div className="text-slate-300 text-sm">Puntos de Rasgo</div>
-                          <div className="text-2xl font-bold text-white">
+                        <div className="p-3 rounded" style={{backgroundColor: stats.prRemaining >= 0 ? '#14532d' : '#7f1d1d'}}>
+                          <div className="text-stone-300 text-sm">Puntos de Rasgo</div>
+                          <div className="text-2xl font-bold text-stone-100">
                             {stats.prUsed} / {stats.prBase}
                           </div>
-                          <div className="text-sm mt-1" style={{color: stats.prRemaining >= 0 ? '#4ade80' : '#f87171'}}>
+                          <div className="text-sm mt-1" style={{color: stats.prRemaining >= 0 ? '#86efac' : '#fca5a5'}}>
                             Restantes: {stats.prRemaining}
                           </div>
                         </div>
@@ -713,9 +844,9 @@
 
                       <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
                         {selectedTraits.map(trait => (
-                          <div key={trait.id} className="p-3 bg-slate-700 rounded">
+                          <div key={trait.id} className="p-3 bg-stone-700 rounded">
                             <div className="flex justify-between items-start mb-1">
-                              <div className="font-semibold text-white text-sm">{trait.name}</div>
+                              <div className="font-semibold text-stone-100 text-sm">{trait.name}</div>
                               <button
                                 onClick={() => removeTrait(trait.id)}
                                 className="text-red-400 hover:text-red-300 ml-2 text-xl"
@@ -723,8 +854,8 @@
                                 ×
                               </button>
                             </div>
-                            <div className="text-xs text-slate-400">{trait.desc}</div>
-                            <div className="text-xs mt-1" style={{color: trait.cost > 0 ? '#4ade80' : '#f87171'}}>
+                            <div className="text-xs text-stone-400">{trait.desc}</div>
+                            <div className="text-xs mt-1" style={{color: trait.cost > 0 ? '#86efac' : '#fca5a5'}}>
                               {trait.cost > 0 ? '+' : ''}{trait.cost} PR
                             </div>
                           </div>
@@ -734,7 +865,7 @@
                       <button
                         onClick={exportAsText}
                         disabled={!name}
-                        className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded font-semibold transition-colors"
+                        className="w-full py-3 bg-green-700 hover:bg-green-800 disabled:bg-stone-600 disabled:cursor-not-allowed text-stone-100 rounded font-semibold transition-colors"
                       >
                         📄 Exportar como Markdown
                       </button>
