@@ -1,0 +1,1516 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Creador de Criaturas PP2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.97) translateY(-8px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    @keyframes slideDown {
+      from { opacity: 0; max-height: 0; }
+      to { opacity: 1; max-height: 2000px; }
+    }
+    .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+    .animate-fade-in-fast { animation: fadeIn 0.2s ease-out forwards; }
+    .font-display { font-family: 'Cinzel', serif; }
+    .font-body { font-family: 'EB Garamond', serif; }
+    body { font-family: 'EB Garamond', serif; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #1c1917; }
+    ::-webkit-scrollbar-thumb { background: #57534e; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #78716c; }
+    .ornament::before, .ornament::after { content: '✦'; color: #92400e; margin: 0 8px; font-size: 10px; }
+  </style>
+</head>
+<body class="bg-stone-950 text-stone-200 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react">
+    const { useState, useMemo, useEffect, useCallback, useRef } = React;
+
+    const CHALLENGE_RATINGS = [
+      { nd: '1/8', resistencia: 4,   defensa: 7,  bonoBase: 0, danoBase: '1d6 - 3',  pr: 0  },
+      { nd: '1/4', resistencia: 7,   defensa: 8,  bonoBase: 0, danoBase: '1d6 - 2',  pr: 1  },
+      { nd: '1/2', resistencia: 12,  defensa: 8,  bonoBase: 1, danoBase: '1d6 - 1',  pr: 1  },
+      { nd: '1',   resistencia: 17,  defensa: 8,  bonoBase: 2, danoBase: '1d6',       pr: 2  },
+      { nd: '2',   resistencia: 27,  defensa: 8,  bonoBase: 3, danoBase: '1d6+1',     pr: 3  },
+      { nd: '3',   resistencia: 37,  defensa: 9,  bonoBase: 4, danoBase: '2d6-1',     pr: 4  },
+      { nd: '4',   resistencia: 52,  defensa: 9,  bonoBase: 4, danoBase: '2d6',       pr: 5  },
+      { nd: '5',   resistencia: 67,  defensa: 10, bonoBase: 5, danoBase: '2d6+1',     pr: 6  },
+      { nd: '6',   resistencia: 72,  defensa: 10, bonoBase: 5, danoBase: '2d6+2',     pr: 7  },
+      { nd: '7',   resistencia: 82,  defensa: 11, bonoBase: 6, danoBase: '2d6+2',     pr: 8  },
+      { nd: '8',   resistencia: 92,  defensa: 11, bonoBase: 6, danoBase: '2d6+3',     pr: 9  },
+      { nd: '9',   resistencia: 102, defensa: 12, bonoBase: 7, danoBase: '3d6',       pr: 10 },
+      { nd: '10',  resistencia: 112, defensa: 12, bonoBase: 7, danoBase: '3d6+1',     pr: 10 },
+      { nd: '11',  resistencia: 122, defensa: 12, bonoBase: 7, danoBase: '3d6+1',     pr: 11 },
+      { nd: '12',  resistencia: 132, defensa: 13, bonoBase: 8, danoBase: '3d6+2',     pr: 11 },
+      { nd: '13',  resistencia: 142, defensa: 13, bonoBase: 8, danoBase: '4d6',       pr: 12 },
+      { nd: '14',  resistencia: 152, defensa: 14, bonoBase: 9, danoBase: '4d6+1',     pr: 13 },
+      { nd: '15',  resistencia: 162, defensa: 14, bonoBase: 9, danoBase: '4d6+2',     pr: 14 },
+    ];
+
+    const SIZES = [
+      { name: 'Minúsculo', modResistencia: -5,  modDefensa: 3  },
+      { name: 'Pequeño',   modResistencia: -5,  modDefensa: 1  },
+      { name: 'Mediano',   modResistencia: 0,   modDefensa: 0  },
+      { name: 'Grande',    modResistencia: 15,  modDefensa: -1 },
+      { name: 'Enorme',    modResistencia: 30,  modDefensa: -2 },
+      { name: 'Colosal',   modResistencia: 60,  modDefensa: -4 },
+    ];
+
+    const CATEGORIES = [
+      { name: 'Bestia', abilities: [
+        { name: 'Instinto Primario',  description: 'Tiene ventaja en las tiradas de percepción para detectar peligros.' },
+        { name: 'Presa Marcada',      description: 'Elige un objetivo al inicio del combate. Tiene ventaja en todos sus ataques contra ese objetivo durante el combate.' },
+        { name: 'Manada',             description: 'Si hay otra Bestia aliada adyacente al inicio de su turno, sus ataques infligen +1d6 de daño adicional ese turno.' },
+      ]},
+      { name: 'Monstruo', abilities: [
+        { name: 'Presencia Aterradora', description: 'Quienes lo vean por primera vez deben superar una Salvación de Aura (ND 12) o quedar Asustados por 1 turno.' },
+        { name: 'Anatomía Aberrante',   description: 'Tiene ventaja en todas las Tiradas de Salvación.' },
+        { name: 'Hambre Insaciable',    description: 'Cuando reduce a un enemigo a 0 de Resistencia, recupera inmediatamente 1d6 de Resistencia.' },
+      ]},
+      { name: 'Espíritu', abilities: [
+        { name: 'Incorpóreo',       description: 'Tiene Resistencia a los daños Cortante, Penetrante y Contundente de fuentes no mágicas.' },
+        { name: 'Eco del Pasado',   description: 'Una vez por combate puede repetir cualquier tirada propia y quedarse con el resultado más alto.' },
+        { name: 'Presencia Etérea', description: 'Los ataques de oportunidad contra él siempre fallan automáticamente.' },
+      ]},
+      { name: 'Exaltado', abilities: [
+        { name: 'Toque Divino',  description: 'Sus ataques infligen 1d6 de daño Radiante adicional.' },
+        { name: 'Escudo de Fe',  description: 'Una vez por turno, cuando recibe daño, puede reducirlo en 1d6.' },
+        { name: 'Aura Bendita',  description: 'Los aliados a 5m tienen ventaja en sus Tiradas de Salvación.' },
+      ]},
+      { name: 'Corrupto', abilities: [
+        { name: 'Toque Profano',         description: 'Sus ataques infligen 1d6 de daño Corrosivo adicional.' },
+        { name: 'Podredumbre Contagiosa',description: 'Los enemigos que fallen una Salvación contra sus ataques reducen su Defensa en 1 hasta el final del combate.' },
+        { name: 'Maldición Persistente', description: 'Cuando muere, el enemigo que lo mató queda Envenenado por 1d6 turnos.' },
+      ]},
+      { name: 'Elemental', abilities: [
+        { name: 'Toque Elemental',    description: 'Sus ataques infligen 1d6 de daño adicional acorde al elemento del que está hecho.' },
+        { name: 'Forma Pura',         description: 'Es inmune al daño de su propio elemento.' },
+        { name: 'Explosión Elemental',description: 'Una vez por combate, su primer ataque del turno afecta también a todas las criaturas adyacentes al objetivo.' },
+      ]},
+      { name: 'Artificial', abilities: [
+        { name: 'Mente Mecánica',          description: 'Es inmune al daño Mental, al estado Asustado y a los venenos.' },
+        { name: 'Protocolo de Combate',    description: 'Al inicio del combate, elige Cuerpo o Destreza. Suma +2 a todas las tiradas con ese atributo durante el combate.' },
+        { name: 'Reparación de Emergencia',description: 'Una vez por combate, cuando cae por debajo de la mitad de su Resistencia, recupera inmediatamente 1d6+2 de Resistencia.' },
+      ]},
+      { name: 'NPC', abilities: [
+        { name: 'Vocación',     description: 'Gana un Concepto gratis.' },
+        { name: 'Veterano',     description: 'Tiene ventaja en la tirada de Iniciativa y no puede ser Sorprendido.' },
+        { name: 'Superviviente',description: 'La primera vez que caería a 0 de Resistencia en un combate, queda en 1 en su lugar.' },
+      ]},
+    ];
+
+    const NATURES = [
+      "Apasionadamente","Astutamente","Brutalmente","Caóticamente",
+      "Carismáticamente","Cautelosamente","Compasivamente","Curiosamente",
+      "Despiadadamente","Devotamente","Discretamente","Elegantemente",
+      "Ferozmente","Fervientemente","Fríamente","Impulsivamente",
+      "Metódicamente","Orgullosamente","Rápidamente","Silenciosamente",
+      "Siniestramente","Sutilmente","Tenazmente","Valientemente"
+    ];
+
+    const DAMAGE_TYPES = ['Contundente','Cortante','Penetrante','Fuego','Hielo','Eléctrico','Corrosivo','Radiante','Mental','Variable'];
+
+    const ALL_CONCEPTS = [
+      "Agricultor","Alfarero","Artesano","Astrólogo","Bardo","Botánico","Carpintero","Cazador","Cocinero","Constructor",
+      "Cortesano","Curandero","Domador","Erudito","Espía","Espiritista","Explorador","Filósofo","Guerrero","Hechicero",
+      "Herrero","Historiador","Ingeniero","Ladrón","Lingüista","Marinero","Mercader","Minero","Monje","Noble",
+      "Naturalista","Pescador","Pícaro","Profesor","Sacerdote","Sastre","Tintorero"
+    ];
+
+    const MOVEMENT_TYPES = ['Nadar','Trepar','Excavar'];
+
+    const STATUS_EFFECTS = [
+      'Asfixiado','Asustado','Aturdido','Controlado','Derribado','Dormido','Encantado',
+      'Envenenado','Envenenado Mayor','Inmovilizado','Quemado','Quemado Mayor'
+    ];
+
+    const ELEMENTS = ['Agua','Tierra','Fuego','Aire','Hielo','Rayo','Sombra','Luz'];
+
+    const TRAITS_POSITIVE = [
+      // ATRIBUTOS Y VITALIDAD
+      { name: 'Mejora de Atributo',              cost: 2, category: 'Atributos y Vitalidad', description: 'Aumenta en +1 uno de los Atributos Primarios (Cuerpo, Destreza o Aura). Puede comprarse varias veces.', restriction: null },
+      { name: 'Mejora de Atributo Condicionado', cost: 1, category: 'Atributos y Vitalidad', description: 'Gana +1 a un atributo al encontrarse en una situación determinada (ej: bajo el agua, con mitad de resistencia, envenenado, etc.)', restriction: null },
+      { name: 'Especialista',                    cost: 1, category: 'Atributos y Vitalidad', description: 'La criatura gana ventaja en tiradas sobre un campo o actividad específica.', restriction: null },
+      { name: 'Dotado',                          cost: 1, category: 'Atributos y Vitalidad', description: 'La criatura gana +3 en tiradas sobre un campo o actividad específica.', restriction: null },
+      { name: 'Vitalidad Aumentada',             cost: 1, category: 'Atributos y Vitalidad', description: 'Aumenta la Resistencia máxima de la criatura en +10. Puede comprarse varias veces.', restriction: null },
+      { name: 'Versatilidad Conceptual',         cost: 2, category: 'Atributos y Vitalidad', description: 'La criatura aprende un nuevo Concepto de la lista general.', restriction: null },
+      { name: 'Versatilidad de Carácter',        cost: 1, category: 'Atributos y Vitalidad', description: 'La criatura aprende una nueva Naturaleza de la lista general.', restriction: null },
+      // OFENSIVOS
+      { name: 'Ataque Adicional',              cost: 1, category: 'Ofensivos', description: 'Puede hacer un segundo ataque en su turno (sin sumar su Bono de Ataque).', restriction: null },
+      { name: 'Alcance Mejorado',              cost: 1, category: 'Ofensivos', description: 'El alcance de sus ataques cuerpo a cuerpo aumenta en 3 metros.', restriction: null },
+      { name: 'Alcance Mejorado Superior',     cost: 2, category: 'Ofensivos', description: 'El alcance de sus ataques cuerpo a cuerpo aumenta en 6 metros.', restriction: null },
+      { name: 'Proyectil',                     cost: 1, category: 'Ofensivos', description: 'Puede realizar un ataque a distancia con un rango de 15/20m (usa Destreza, daño base).', restriction: null, autoAttack: { range: '15/20', name: 'Proyectil' } },
+      { name: 'Proyectil Superior',            cost: 2, category: 'Ofensivos', description: 'Puede realizar un ataque a distancia con un rango de 20/40m (usa Destreza, daño base).', restriction: null, autoAttack: { range: '20/40', name: 'Proyectil Superior' } },
+      { name: 'Incremento al Daño',            cost: 1, category: 'Ofensivos', description: 'Un ataque de la criatura gana +1 al daño.', restriction: null },
+      { name: 'Incremento al Daño Superior',   cost: 2, category: 'Ofensivos', description: 'Un ataque de la criatura gana +3 al daño.', restriction: null },
+      { name: 'Incremento al Daño total',      cost: 2, category: 'Ofensivos', description: 'Todos los ataques de la criatura ganan +1 al daño.', restriction: null },
+      { name: 'Incremento al Daño total Superior', cost: 4, category: 'Ofensivos', description: 'Todos los ataques de la criatura ganan +3 al daño.', restriction: null },
+      { name: 'Incremento al Ataque',          cost: 1, category: 'Ofensivos', description: 'Un ataque de la criatura gana +1 a la tirada de ataque.', restriction: null },
+      { name: 'Incremento al Ataque Superior', cost: 2, category: 'Ofensivos', description: 'Un ataque de la criatura gana +3 a la tirada de ataque.', restriction: null },
+      { name: 'Incremento al Ataque total',    cost: 2, category: 'Ofensivos', description: 'Todos los ataques de la criatura ganan +1 a la tirada de ataque.', restriction: null },
+      { name: 'Incremento al Ataque total Superior', cost: 4, category: 'Ofensivos', description: 'Todos los ataques de la criatura ganan +3 a la tirada de ataque.', restriction: null },
+      { name: 'Ataque Poderoso',    cost: 1, category: 'Ofensivos', description: 'Puede elegir sufrir -2 a su tirada de ataque para ganar +3 al daño.', restriction: null },
+      { name: 'Sangrado',           cost: 1, category: 'Ofensivos', description: 'Sus ataques Cortantes/Penetrantes hacen que el objetivo sufra 1d6 de daño al final de su próximo turno.', restriction: null },
+      { name: 'Carga Imparable',    cost: 1, category: 'Ofensivos', description: 'Si se mueve al menos 5m en línea recta antes de atacar, inflige 1d6 de daño adicional.', restriction: null },
+      { name: 'Arrollar',           cost: 1, category: 'Ofensivos', description: 'Puede moverse a través del espacio de criaturas de un tamaño inferior, forzándolas a una Salvación de Destreza (ND 12) o ser Derribados.', restriction: null },
+      { name: 'Engarro',            cost: 1, category: 'Ofensivos', description: 'Si impacta un ataque, puede intentar una maniobra de Apresar como Acción Rápida.', restriction: null },
+      { name: 'Crítico Mejorado',   cost: 2, category: 'Ofensivos', description: 'Sus ataques infligen el doble de daño con un resultado Crítico en la tirada de ataque.', restriction: null },
+      { name: 'Golpe Debilitante',  cost: 2, category: 'Ofensivos', description: 'Cuando impacta un ataque, el objetivo sufre una penalización de -1 a todas sus acciones hasta el final de su próximo turno.', restriction: null },
+      { name: 'Furia',              cost: 2, category: 'Ofensivos', description: 'Mientras tenga la mitad de su Resistencia o menos, sus ataques infligen 1d6 de daño adicional.', restriction: null },
+      { name: 'Veneno de Contacto', cost: 2, category: 'Ofensivos', description: 'Al impactar, el objetivo debe superar una Salvación de Cuerpo (ND 13) o quedar Envenenado.', restriction: null },
+      { name: 'Estado añadido',         cost: 1, category: 'Ofensivos', description: 'Al impactar con un ataque, el objetivo debe superar una Salvación de Aura (ND 9) o sufrir un estado alterado seleccionado.', restriction: null },
+      { name: 'Estado añadido Superior',cost: 3, category: 'Ofensivos', description: 'Al impactar con un ataque, el objetivo debe superar una Salvación de Aura (ND 12) o sufrir un estado alterado seleccionado.', restriction: null },
+      { name: 'Corrosión',       cost: 2, category: 'Ofensivos', description: 'Sus ataques Corrosivos reducen el bono de la armadura del objetivo en 1 punto permanentemente.', restriction: null },
+      { name: 'Corrosión Mayor', cost: 4, category: 'Ofensivos', description: 'Sus ataques Corrosivos reducen el bono de la armadura del objetivo en 3 puntos permanentemente.', restriction: null },
+      { name: 'Francotirador',    cost: 1, category: 'Ofensivos', description: 'No sufre penalización por atacar a larga distancia con armas de rango.', restriction: null },
+      { name: 'Combate a Ciegas', cost: 2, category: 'Ofensivos', description: 'No sufre penalizaciones a sus ataques por no poder ver a su objetivo.', restriction: null },
+      { name: 'Ataque Vorpal',    cost: 3, category: 'Ofensivos', description: 'En un golpe crítico, el ataque inflige el triple de daño en lugar del doble.', restriction: null },
+      { name: 'Ráfaga',           cost: 3, category: 'Ofensivos', description: 'Si reduce a una criatura a 0 de Resistencia, puede realizar un ataque adicional como Acción Rápida.', restriction: null },
+      { name: 'Drenaje menor',    cost: 2, category: 'Ofensivos', description: 'Al realizar daño con uno de sus ataques recupera la mitad del daño realizado como resistencia.', restriction: null },
+      { name: 'Drenaje',          cost: 3, category: 'Ofensivos', description: 'Al realizar daño con uno de sus ataques recupera la misma cantidad de resistencia que el daño realizado.', restriction: null },
+      { name: 'Inducir fatiga',   cost: 3, category: 'Ofensivos', description: 'Al realizar daño con uno de sus ataques el objetivo obtiene un nivel de fatiga.', restriction: null },
+      { name: 'Emboscador',       cost: 1, category: 'Ofensivos', description: 'Cuando ataca a un enemigo que aún no ha actuado en el combate, inflige 1d6 de daño adicional.', restriction: null },
+      { name: 'Ataque en Área',          cost: 2, category: 'Ofensivos', description: 'Una vez por turno, puede hacer un ataque que afecta a todas las criaturas adyacentes (Salvación de Destreza ND 12 para evitar la mitad del daño).', restriction: null },
+      { name: 'Fauces Aferradoras',      cost: 2, category: 'Ofensivos', description: 'Si impacta con un ataque de mordida o similar, el objetivo queda Inmovilizado hasta el inicio del próximo turno.', restriction: null },
+      { name: 'Tóxico',                  cost: 1, category: 'Ofensivos', description: 'Sus ataques dejan una marca acumulativa. Si el mismo objetivo recibe dos ataques en el mismo turno, queda Envenenado.', restriction: null },
+      // DEFENSIVOS
+      { name: 'Armadura Natural',     cost: 1, category: 'Defensivos', description: '+1 a la Defensa. (Comprable varias veces).', restriction: null },
+      { name: 'Resistente',           cost: 1, category: 'Defensivos', description: 'Gana Resistencia a un tipo de daño.', restriction: null },
+      { name: 'Inmune',               cost: 2, category: 'Defensivos', description: 'Gana Inmunidad a un tipo de daño.', restriction: null },
+      { name: 'Inmunidad a estado',   cost: 2, category: 'Defensivos', description: 'La criatura es inmune a un estado alterado seleccionado.', restriction: null },
+      { name: 'Piel Gruesa',          cost: 1, category: 'Defensivos', description: 'Ignora 1 punto de daño de todas las fuentes. (Comprable varias veces).', restriction: null },
+      { name: 'Indomable',            cost: 2, category: 'Defensivos', description: 'Es inmune a los estados Asustado y Controlado.', restriction: null },
+      { name: 'Escurridizo',          cost: 1, category: 'Defensivos', description: 'No provoca ataques de oportunidad al moverse fuera del alcance de un enemigo.', restriction: null },
+      { name: 'Regeneración Menor',   cost: 1, category: 'Defensivos', description: 'Al inicio de su turno, recupera 3 de Resistencia.', restriction: null },
+      { name: 'Regeneración Mayor',   cost: 2, category: 'Defensivos', description: 'Al inicio de su turno, recupera 5 de Resistencia.', restriction: null },
+      { name: 'Piel de Espinas',      cost: 2, category: 'Defensivos', description: 'Cualquier criatura que le golpee con un ataque cuerpo a cuerpo sufre 1d6 de daño Penetrante.', restriction: null },
+      { name: 'Resistencia a Críticos',cost: 2, category: 'Defensivos', description: 'Cualquier golpe crítico contra esta criatura se considera un golpe normal.', restriction: null },
+      { name: 'Fortaleza Interior',   cost: 1, category: 'Defensivos', description: 'Ventaja en Salvaciones contra veneno y enfermedades.', restriction: null },
+      { name: 'Piel Resbaladiza',     cost: 1, category: 'Defensivos', description: 'Ventaja para evitar o escapar de una presa.', restriction: null },
+      { name: 'Desplazamiento',       cost: 3, category: 'Defensivos', description: 'Los ataques tienen desventaja. Si es golpeado, se desactiva hasta su próximo turno.', restriction: null },
+      { name: 'Amorfo',               cost: 3, category: 'Defensivos', description: 'Inmune a críticos y no puede ser apresado.', restriction: null },
+      { name: 'Corazón Doble',        cost: 3, category: 'Defensivos', description: 'La primera vez que llega a 0 de Resistencia, en su lugar se queda con la mitad de su máximo.', restriction: null },
+      { name: 'Duro de Matar',        cost: 2, category: 'Defensivos', description: 'Si llega a 0 de Resistencia, no cae Agotado inmediatamente; puede actuar un turno más.', restriction: null },
+      { name: 'Muerte Explosiva',      cost: 1, category: 'Defensivos', description: 'Al morir, explota e inflige 1d6 de daño a 5m.', restriction: null },
+      { name: 'Muerte Explosiva Mayor',cost: 2, category: 'Defensivos', description: 'Al morir, detona e inflige 2d6 de daño a 10m.', restriction: null },
+      { name: 'Absorción de Daño',    cost: 2, category: 'Defensivos', description: 'Gana Resistencia a un tipo de daño y recupera 1 por cada punto reducido.', restriction: null },
+      { name: 'Recuperación Menor',   cost: 1, category: 'Defensivos', description: 'En vez de atacar, recupera 1d6 de resistencia.', restriction: null },
+      { name: 'Recuperación',         cost: 2, category: 'Defensivos', description: 'En vez de atacar, recupera 1d6+1 de resistencia.', restriction: null },
+      { name: 'Recuperación Mayor',   cost: 3, category: 'Defensivos', description: 'En vez de atacar, recupera 3d6+3 de resistencia.', restriction: null },
+      { name: 'Caparazón',            cost: 2, category: 'Defensivos', description: 'La primera vez que recibe daño en su turno, reduce ese daño en 3.', restriction: null },
+      { name: 'Cuerpo Inerte',        cost: 3, category: 'Defensivos', description: 'Inmune a Envenenado, Quemado y Asfixiado.', restriction: null },
+      { name: 'Últimas Palabras',     cost: 2, category: 'Defensivos', description: 'Cuando cae a 0 de Resistencia, realiza un último ataque gratuito.', restriction: null },
+      // MOVILIDAD
+      { name: 'Movimiento Especial',        cost: 1, category: 'Movilidad', description: 'Gana velocidad de Nadar, Trepar o Excavar.', restriction: null },
+      { name: 'Iniciativa Mejorada',        cost: 1, category: 'Movilidad', description: '+3 a la iniciativa. (Comprable varias veces).', restriction: null },
+      { name: 'Velocidad Mejorada',         cost: 1, category: 'Movilidad', description: 'Velocidad terrestre +3m.', restriction: null },
+      { name: 'Pies Ligeros',              cost: 1, category: 'Movilidad', description: 'Ignora terreno difícil.', restriction: null },
+      { name: 'Saltador',                  cost: 1, category: 'Movilidad', description: 'Puede saltar el doble de distancia.', restriction: null },
+      { name: 'Anfibio',                   cost: 1, category: 'Movilidad', description: 'Respira aire y agua.', restriction: null },
+      { name: 'Vuelo',                     cost: 2, category: 'Movilidad', description: 'Velocidad de vuelo igual a su velocidad terrestre.', restriction: null },
+      { name: 'Inamovible',                cost: 1, category: 'Movilidad', description: 'No puede ser empujado o derribado contra su voluntad.', restriction: null },
+      { name: 'Libertad de Movimiento',    cost: 2, category: 'Movilidad', description: 'No puede ser apresado o inmovilizado.', restriction: null },
+      { name: 'Acechador del Terreno',     cost: 1, category: 'Movilidad', description: 'Ventaja en sigilo en un terreno específico.', restriction: null },
+      { name: 'Acróbata',                  cost: 2, category: 'Movilidad', description: 'Puede moverse a través de espacios ocupados por enemigos.', restriction: null },
+      { name: 'Retirada Veloz',            cost: 1, category: 'Movilidad', description: 'Puede usar Acción Rápida para retirarse sin provocar ataques de oportunidad.', restriction: null },
+      { name: 'Siempre de Pie',            cost: 1, category: 'Movilidad', description: 'Levantarse del estado Derribado no cuesta movimiento.', restriction: null },
+      { name: 'Caminar por los Muros',     cost: 2, category: 'Movilidad', description: 'Puede trepar por superficies verticales y techos sin usar las manos.', restriction: null },
+      { name: 'Teletransporte Condicionado',cost:2, category: 'Movilidad', description: 'Puede usar Acción Rápida para teletransportarse 5m de un elemento a otro (sombras, charcos, espejos, etc.).', restriction: null },
+      { name: 'Paso Etéreo',              cost: 3, category: 'Movilidad', description: 'Como Acción Principal, se mueve a través de objetos y criaturas hasta final de turno.', restriction: null },
+      { name: 'Nómada del Plano',         cost: 3, category: 'Movilidad', description: 'Una vez al día, teletransporte a cualquier lugar visto.', restriction: null },
+      { name: 'Emboscada Sombría',        cost: 2, category: 'Movilidad', description: 'Si comienza su turno sin ser detectado, puede moverse la mitad de su velocidad sin gastar movimiento.', restriction: null },
+      { name: 'Carga de Impacto',         cost: 2, category: 'Movilidad', description: 'Si se mueve 5m hacia un objetivo y ataca, puede empujarlo 3m (Salvación Cuerpo ND 13 o Derribado).', restriction: null },
+      // AURA Y PERCEPCIÓN
+      { name: 'Sentidos Agudos',        cost: 1, category: 'Aura y Percepción', description: 'Ventaja en todas las tiradas de percepción.', restriction: null },
+      { name: 'Visión en la Oscuridad', cost: 1, category: 'Aura y Percepción', description: 'Ve en la oscuridad total.', restriction: null },
+      { name: 'Sentido del Peligro',    cost: 2, category: 'Aura y Percepción', description: 'No puede ser sorprendido.', restriction: null },
+      { name: 'Percepción Sísmica',     cost: 1, category: 'Aura y Percepción', description: 'Siente criaturas en contacto con el suelo en radio 10m.', restriction: null },
+      { name: 'Camuflaje',              cost: 1, category: 'Aura y Percepción', description: 'Ventaja en sigilo si permanece inmóvil.', restriction: null },
+      { name: 'Olor Nauseabundo',       cost: 1, category: 'Aura y Percepción', description: 'Quien empiece su turno a 3m debe superar Salvación Cuerpo ND 12 o sufrir desventaja en su próximo ataque.', restriction: null },
+      { name: 'Sentido Ciego',          cost: 2, category: 'Aura y Percepción', description: 'Ve en radio 10m sin usar ojos. No puede ser cegado.', restriction: null },
+      { name: 'Aura Elemental',         cost: 2, category: 'Aura y Percepción', description: 'Al inicio de su turno, todos a 3m sufren 1d6 de daño elemental.', restriction: null },
+      { name: 'Aura de Lentitud',       cost: 2, category: 'Aura y Percepción', description: 'Radio 5m es terreno difícil para enemigos.', restriction: null },
+      { name: 'Incorpóreo',             cost: 3, category: 'Aura y Percepción', description: 'Resistencia a daño físico y puede atravesar objetos.', restriction: null },
+      { name: 'Visión Verdadera',       cost: 3, category: 'Aura y Percepción', description: 'Ve a través de ilusiones e invisibilidad en 15m.', restriction: null },
+      { name: 'Aura de Miedo',          cost: 3, category: 'Aura y Percepción', description: 'Quien empiece su turno a 5m debe superar Salvación Aura ND 13 o quedar Asustado.', restriction: null },
+      { name: 'Aura de Vida',           cost: 2, category: 'Aura y Percepción', description: 'Aliados a 5m recuperan 1d6 al empezar su turno.', restriction: null },
+      { name: 'Aura Antimagia',         cost: 4, category: 'Aura y Percepción', description: 'Cualquiera que intente usar una Técnica a 10m debe superar Aura ND 14 o falla.', restriction: null },
+      { name: 'Mirada Hipnótica',       cost: 2, category: 'Aura y Percepción', description: 'Quien mire a los ojos debe superar Aura ND 13 o no puede atacarla en ese turno.', restriction: null },
+      { name: 'Campo de Interferencia', cost: 2, category: 'Aura y Percepción', description: 'Ataques a distancia contra ella tienen desventaja.', restriction: null },
+      { name: 'Aura Nociva',            cost: 2, category: 'Aura y Percepción', description: 'Quien empiece su turno a 5m debe superar Aura ND 9 o sufrir estado alterado.', restriction: null },
+      { name: 'Aura Nociva Expandida',  cost: 3, category: 'Aura y Percepción', description: 'Quien empiece su turno a 10m debe superar Aura ND 9 o sufrir estado alterado.', restriction: null },
+      { name: 'Aura Nociva Superior',   cost: 3, category: 'Aura y Percepción', description: 'Quien empiece su turno a 5m debe superar Aura ND 12 o sufrir estado alterado.', restriction: null },
+      { name: 'Detecta Mentiras',       cost: 2, category: 'Aura y Percepción', description: 'Sabe cuando le mienten.', restriction: null },
+      { name: 'Eco del Alma',           cost: 2, category: 'Aura y Percepción', description: 'Detecta presencia de criaturas vivas a 15m (no posición exacta).', restriction: null },
+      { name: 'Manto de Terror',        cost: 3, category: 'Aura y Percepción', description: 'La primera vez que inflige daño, enemigos a 10m deben superar Aura ND 12 o sufrir desventaja en ataques.', restriction: null },
+      { name: 'Presencia Perturbadora', cost: 1, category: 'Aura y Percepción', description: 'Enemigos que usen Técnicas a 5m aumentan el ND en +2.', restriction: null },
+      // CONTROL Y ÚNICOS
+      { name: 'Jefe Solitario',         cost: 3, category: 'Control y Únicos', description: 'Puede realizar una Acción Rápida al final del turno de cada jugador.', restriction: null },
+      { name: 'Mente Colmena',          cost: 1, category: 'Control y Únicos', description: 'Inmune a Asustado si ve otro aliado con el mismo rasgo.', restriction: null },
+      { name: 'Líder de la Manada',     cost: 2, category: 'Control y Únicos', description: 'Aliados a 10m ganan +1 a sus tiradas de ataque.', restriction: null },
+      { name: 'Último Aliento',         cost: 2, category: 'Control y Únicos', description: 'Al morir, explota o libera nube tóxica: 2d6 de daño a 3m.', restriction: null },
+      { name: 'Reanimar',               cost: 3, category: 'Control y Únicos', description: 'Una vez al día, reanima a un humanoide muerto a 5m como zombi ND 1/4.', restriction: null },
+      { name: 'Adaptación Rápida',      cost: 2, category: 'Control y Únicos', description: 'La primera vez que recibe daño elemental, gana Resistencia a ese tipo por el resto del encuentro.', restriction: null },
+      { name: 'Dividirse',              cost: 3, category: 'Control y Únicos', description: 'Si es reducido a la mitad de su Resistencia, se divide en dos criaturas idénticas.', restriction: null },
+      { name: 'Absorber Elemento',      cost: 3, category: 'Control y Únicos', description: 'Inmune a un tipo de daño elemental y lo absorbe como curación.', restriction: null },
+      { name: 'Resistencia Legendaria', cost: 2, category: 'Control y Únicos', description: 'Puede elegir superar automáticamente una Salvación fallida.', restriction: null },
+      { name: 'Múltiples Cabezas',      cost: 2, category: 'Control y Únicos', description: 'Ventaja contra Aturdido y una Reacción adicional por ronda.', restriction: null },
+      { name: 'Asimilar',               cost: 4, category: 'Control y Únicos', description: 'Una vez al día, al matar una criatura, gana uno de sus rasgos (coste ≤2 PR) durante 1h.', restriction: null },
+      { name: 'Reflejar Técnica',       cost: 3, category: 'Control y Únicos', description: 'Si es el único objetivo de una Técnica, puede reflejarla al lanzador (Aura ND 15).', restriction: null },
+      { name: 'Tragar Entero',          cost: 2, category: 'Control y Únicos', description: 'Si apresa a un objetivo de tamaño inferior, puede tragarlo.', restriction: null },
+      { name: 'Afinidad con Técnicas',  cost: 1, category: 'Control y Únicos', description: 'Gana 5 PC para diseñar Técnicas por cada PR gastado.', restriction: null },
+      { name: 'Grito Reactivo',         cost: 2, category: 'Control y Únicos', description: 'La primera vez que sufre daño, grita: todos a 5m Aturdidos (Cuerpo ND 13).', restriction: null },
+      { name: 'Invocador Innato',        cost: 3, category: 'Control y Únicos', description: 'Al inicio del combate, invoca 1d6 criaturas de misma categoría de ND ≤1/4.', restriction: null },
+      { name: 'Tamaño cambiante',        cost: 2, category: 'Control y Únicos', description: 'Puede cambiar su tamaño en dos categorías (modifica Defensa pero no Resistencia).', restriction: null },
+      { name: 'Criatura de Leyenda',     cost: 4, category: 'Control y Únicos', description: 'Elige un atributo: los ataques enemigos que lo usen tienen desventaja durante 3 turnos.', restriction: null },
+      { name: 'Pacto de Sangre',         cost: 3, category: 'Control y Únicos', description: 'Al morir, todos los que le hicieron daño sufren 1d6 por cada ataque (máx 3d6).', restriction: null },
+      { name: 'Regeneración Adaptativa', cost: 3, category: 'Control y Únicos', description: 'La primera vez que un tipo de daño la reduce a menos de la mitad de su Resistencia, se vuelve Resistente a él.', restriction: null },
+      { name: 'Sombra Replicante',       cost: 3, category: 'Control y Únicos', description: 'Al inicio del combate, crea una copia ilusoria con 1 de Resistencia. 50% de probabilidad de impactar a la copia.', restriction: null },
+      // NARRATIVOS
+      { name: 'Lengua Plateada',     cost: 1, category: 'Narrativos', description: 'Reduce ND de engaño/persuasión en 2; si falla, no se nota la manipulación.', restriction: null },
+      { name: 'Presencia Imponente', cost: 1, category: 'Narrativos', description: 'La primera vez que la ven, deben superar Aura ND 12 o no pueden iniciar hostilidades en la primera escena.', restriction: null },
+      { name: 'Imitación Parcial',   cost: 2, category: 'Narrativos', description: 'Imita apariencia o voz de un humanoide observado 10 min. ND 13 para detectar.', restriction: null },
+      { name: 'Máscara Perfecta',    cost: 3, category: 'Narrativos', description: 'Imita apariencia, voz y modales. ND 15 para detectar.', restriction: null },
+      { name: 'Palabra Vinculante',  cost: 3, category: 'Narrativos', description: 'Una vez por sesión, hace prometer algo; romperla tiene consecuencias narrativas.', restriction: null },
+      { name: 'Memoria del Mundo',   cost: 3, category: 'Narrativos', description: 'Conoce la historia de cualquier lugar donde esté. Puede revelar un secreto.', restriction: null },
+      { name: 'Presagio',            cost: 1, category: 'Narrativos', description: 'Al morir o huir, pronuncia una profecía vaga.', restriction: null },
+      { name: 'Rastreador',          cost: 1, category: 'Narrativos', description: 'Puede seguir un rastro durante 3 días.', restriction: null },
+      { name: 'Rastreador Implacable',cost: 2, category: 'Narrativos', description: 'Puede seguir un rastro durante 1 mes; los jugadores no pueden perderlo sin magia.', restriction: null },
+      { name: 'Marca de Presa',      cost: 2, category: 'Narrativos', description: 'Marca un objetivo; durante 1 día siempre sabe su dirección general.', restriction: null },
+      { name: 'Presencia Onírica',   cost: 2, category: 'Narrativos', description: 'Aparece en sueños de criaturas que ha visto; no daña pero puede comunicarse.', restriction: null },
+    ];
+
+// RASGOS DE DESVENTAJA (otorgan PR de vuelta)
+    const DISADVANTAGE_TRAITS = [
+      // COSTE +1 PR
+      { name: 'Deficiencia de Atributo',  cost: 'Gana 1', category: 'Rasgos de Desventaja', description: 'Reduce en -1 uno de los Atributos Primarios. No puede bajar de -3.', restriction: null },
+      { name: 'Torpeza Sensorial',        cost: 'Gana 1', category: 'Rasgos de Desventaja', description: 'La criatura tiene desventaja en todas las tiradas de percepción basadas en un sentido. Representa ojos atrofiados, ciegos o inexistentes.', restriction: null },
+      { name: 'Movimiento Lento',         cost: 'Gana 1', category: 'Rasgos de Desventaja', description: 'La velocidad base de la criatura se reduce en 3 metros. No puede comprarse más de dos veces.', restriction: 'Máximo 2 veces' },
+      { name: 'Sin Reacción',             cost: 'Gana 1', category: 'Rasgos de Desventaja', description: 'La criatura no puede realizar Ataques de Oportunidad ni usar habilidades que requieran Reacción.', restriction: null },
+      { name: 'Cuerpo Ruidoso',           cost: 'Gana 1', category: 'Rasgos de Desventaja', description: 'La criatura no puede hacer tiradas de Sigilo. Su presencia siempre es detectada por sonido antes de que pueda sorprender a nadie.', restriction: null },
+      { name: 'Aversión a la Luz',        cost: 'Gana 1', category: 'Rasgos de Desventaja', description: 'En condiciones de luz normal o intensa, la criatura tiene desventaja en sus tiradas de ataque.', restriction: null },
+      { name: 'Dependencia Elemental',    cost: 'Gana 1', category: 'Rasgos de Desventaja', description: 'La criatura necesita estar en contacto con un elemento concreto para funcionar con normalidad. Si pasa más de 3 rondas fuera de él, sufre 1d6 de daño al inicio de cada turno.', restriction: null },
+      { name: 'Instinto Compulsivo',      cost: 'Gana 1', category: 'Rasgos de Desventaja', description: 'Ante un estímulo concreto definido al crear la criatura, debe superar una Salvación de Aura (ND 12) o dedicar su turno a perseguirlo o huir de él.', restriction: null },
+      // COSTE +2 PR
+      { name: 'Vulnerable',               cost: 'Gana 2', category: 'Rasgos de Desventaja', description: 'Gana Vulnerabilidad a un tipo de daño.', restriction: null },
+      { name: 'Defensa Frágil',           cost: 'Gana 2', category: 'Rasgos de Desventaja', description: 'La Defensa base de la criatura se reduce en 2 permanentemente.', restriction: null },
+      { name: 'Vitalidad Mermada',        cost: 'Gana 2', category: 'Rasgos de Desventaja', description: 'La Resistencia máxima de la criatura se reduce en 10.', restriction: null },
+      { name: 'Furia Incontrolable',      cost: 'Gana 2', category: 'Rasgos de Desventaja', description: 'Cuando la criatura llega a la mitad de su Resistencia, entra en un estado de furia y debe atacar al objetivo más cercano, sea aliado o enemigo. Puede repetir la Salvación de Aura (ND 13) al inicio de cada turno para recuperar el control.', restriction: null },
+      { name: 'Punto Débil',              cost: 'Gana 2', category: 'Rasgos de Desventaja', description: 'Un tipo de daño elegido al crear la criatura ignora completamente su Resistencia y sus Inmunidades, tratando siempre el daño como si fuera normal, sin reducción de ningún tipo.', restriction: null },
+      { name: 'Lentitud Reactiva',        cost: 'Gana 2', category: 'Rasgos de Desventaja', description: 'La criatura siempre actúa en último lugar en la Iniciativa, independientemente de su tirada. Si hay un empate en el último lugar, actúa después de todos ellos.', restriction: null },
+      { name: 'Vínculo al Lugar',         cost: 'Gana 2', category: 'Rasgos de Desventaja', description: 'Ligada a una ubicación concreta; fuera de ella baja un escalón de ND efectivo. Dentro tiene ventaja en todas sus acciones.', restriction: null },
+      // COSTE +3 PR
+      { name: 'Cadena de Invocación',     cost: 'Gana 3', category: 'Rasgos de Desventaja', description: 'La criatura solo existe mientras otra criatura designada al crearla (su «ancla») siga viva. Si el ancla muere o queda Agotada, esta criatura cae a 0 de Resistencia inmediatamente.', restriction: null },
+      { name: 'Maldición Refleja',        cost: 'Gana 3', category: 'Rasgos de Desventaja', description: 'Cada vez que la criatura inflige daño, también recibe la mitad de ese daño sobre sí misma. No puede reducirse por ningún efecto.', restriction: null },
+      { name: 'Ciclo de Colapso',         cost: 'Gana 3', category: 'Rasgos de Desventaja', description: 'Al final de cada ronda completa de combate, la criatura sufre un nivel de Fatiga acumulable. Estos niveles no pueden eliminarse durante el combate.', restriction: null },
+      { name: 'Límite de Acción',         cost: 'Gana 3', category: 'Rasgos de Desventaja', description: 'La criatura solo puede realizar una acción por turno, sea Principal o Rápida, nunca ambas. No puede usar Reacciones ese turno si ya actuó.', restriction: null },
+    ];
+
+    const ALL_TRAITS = [...TRAITS_POSITIVE, ...DISADVANTAGE_TRAITS];
+
+    const ALL_WEAPONS = [
+      { name: 'Arma Improvisada',         category: 'Armas Simples CC',      damage: '1d6 - 3', damageType: 'Variable',     properties: [],                                                                                           cost: '0 L'    },
+      { name: 'Daga / Cuchillo',          category: 'Armas Simples CC',      damage: '1d6 - 2', damageType: 'Penetrante',   properties: [{ name: 'Ligera' }, { name: 'Arrojadiza', details: '5/10' }],                            cost: '4 L'    },
+      { name: 'Bastón',                   category: 'Armas Simples CC',      damage: '1d6 - 1', damageType: 'Contundente',  properties: [{ name: 'A dos manos' }],                                                                 cost: '1 L'    },
+      { name: 'Maza Ligera',              category: 'Armas Simples CC',      damage: '1d6',     damageType: 'Contundente',  properties: [{ name: 'Ligera' }],                                                                      cost: '20 L'   },
+      { name: 'Hoz',                      category: 'Armas Simples CC',      damage: '1d6 - 1', damageType: 'Cortante',     properties: [{ name: 'Ligera' }],                                                                      cost: '5 L'    },
+      { name: 'Lanza Corta',              category: 'Armas Simples CC',      damage: '1d6',     damageType: 'Penetrante',   properties: [{ name: 'Arrojadiza', details: '10/20' }],                                               cost: '10 L'   },
+      { name: 'Honda',                    category: 'Armas Simples Dist.',   damage: '1d6 - 2', damageType: 'Contundente',  properties: [{ name: 'Rango', details: '15/30' }],                                                    cost: '1 L'    },
+      { name: 'Arco Corto',               category: 'Armas Simples Dist.',   damage: '1d6',     damageType: 'Penetrante',   properties: [{ name: 'A dos manos' }, { name: 'Rango', details: '20/40' }],                          cost: '50 L'   },
+      { name: 'Ballesta Ligera',          category: 'Armas Simples Dist.',   damage: '1d6 + 1', damageType: 'Penetrante',   properties: [{ name: 'A dos manos' }, { name: 'Rango', details: '25/50' }, { name: 'Recarga', details: 'Rápida' }], cost: '70 L' },
+      { name: 'Espada Corta',             category: 'Armas Marciales CC',    damage: '1d6',     damageType: 'Cortante',     properties: [{ name: 'Ligera' }],                                                                      cost: '20 L'   },
+      { name: 'Hacha de Mano',            category: 'Armas Marciales CC',    damage: '1d6',     damageType: 'Cortante',     properties: [{ name: 'Ligera' }, { name: 'Arrojadiza', details: '5/10' }],                            cost: '20 L'   },
+      { name: 'Estoque',                  category: 'Armas Marciales CC',    damage: '1d6',     damageType: 'Penetrante',   properties: [{ name: 'Ligera' }],                                                                      cost: '25 L'   },
+      { name: 'Cimitarra',                category: 'Armas Marciales CC',    damage: '1d6',     damageType: 'Cortante',     properties: [{ name: 'Ligera' }],                                                                      cost: '25 L'   },
+      { name: 'Lanza',                    category: 'Armas Marciales CC',    damage: '1d6 + 1', damageType: 'Penetrante',   properties: [{ name: 'Versátil', details: '2d6-1' }, { name: 'Alcance' }],                           cost: '25 L'   },
+      { name: 'Espada Larga',             category: 'Armas Marciales CC',    damage: '1d6 + 1', damageType: 'Cortante',     properties: [{ name: 'Versátil', details: '2d6' }],                                                   cost: '30 L'   },
+      { name: 'Martillo de Guerra',       category: 'Armas Marciales CC',    damage: '1d6 + 1', damageType: 'Contundente',  properties: [{ name: 'Versátil', details: '2d6' }],                                                   cost: '30 L'   },
+      { name: 'Hacha de Guerra',          category: 'Armas Marciales CC',    damage: '1d6 + 1', damageType: 'Cortante',     properties: [{ name: 'Versátil', details: '2d6' }],                                                   cost: '30 L'   },
+      { name: 'Maza Pesada',              category: 'Armas Marciales CC',    damage: '2d6 - 1', damageType: 'Contundente',  properties: [{ name: 'Pesada' }],                                                                      cost: '40 L'   },
+      { name: 'Alabarda',                 category: 'Armas Marciales CC',    damage: '2d6',     damageType: 'Cortante',     properties: [{ name: 'Pesada' }, { name: 'A dos manos' }, { name: 'Alcance' }],                      cost: '50 L'   },
+      { name: 'Mandoble / Espadón',       category: 'Armas Marciales CC',    damage: '2d6',     damageType: 'Cortante',     properties: [{ name: 'Pesada' }, { name: 'A dos manos' }],                                            cost: '55 L'   },
+      { name: 'Gran Hacha',               category: 'Armas Marciales CC',    damage: '2d6 + 1', damageType: 'Cortante',     properties: [{ name: 'Pesada' }, { name: 'A dos manos' }],                                            cost: '60 L'   },
+      { name: 'Martillo a Dos Manos',     category: 'Armas Marciales CC',    damage: '2d6 + 1', damageType: 'Contundente',  properties: [{ name: 'Pesada' }, { name: 'A dos manos' }],                                            cost: '60 L'   },
+      { name: 'Arco Largo',               category: 'Armas Marciales Dist.', damage: '1d6 + 1', damageType: 'Penetrante',   properties: [{ name: 'Pesada' }, { name: 'A dos manos' }, { name: 'Rango', details: '35/70' }],     cost: '80 L'   },
+      { name: 'Ballesta Pesada',          category: 'Armas Marciales Dist.', damage: '2d6',     damageType: 'Penetrante',   properties: [{ name: 'Pesada' }, { name: 'A dos manos' }, { name: 'Rango', details: '40/80' }, { name: 'Recarga', details: 'Principal' }], cost: '120 L' },
+    ];
+
+    const ALL_ARMORS = [
+      { name: 'Ropas Acolchadas',    type: 'Ligera',  defenseBonus: 2, dexLimit: null, cuerpoRequirement: 0, sigiloPenalty: 0,  cost: '10 L'   },
+      { name: 'Armadura de Cuero',   type: 'Ligera',  defenseBonus: 3, dexLimit: null, cuerpoRequirement: 0, sigiloPenalty: 0,  cost: '20 L'   },
+      { name: 'Cota de Mallas',      type: 'Media',   defenseBonus: 4, dexLimit: 2,    cuerpoRequirement: 2, sigiloPenalty: -1, cost: '150 L'  },
+      { name: 'Armadura de Escamas', type: 'Media',   defenseBonus: 5, dexLimit: 2,    cuerpoRequirement: 2, sigiloPenalty: -2, cost: '200 L'  },
+      { name: 'Armadura de Placas',  type: 'Pesada',  defenseBonus: 6, dexLimit: 1,    cuerpoRequirement: 3, sigiloPenalty: -3, cost: '800 L'  },
+      { name: 'Armadura Completa',   type: 'Pesada',  defenseBonus: 7, dexLimit: 0,    cuerpoRequirement: 4, sigiloPenalty: -4, cost: '3000 L' },
+    ];
+
+    const ALL_SHIELDS = [
+      { name: 'Broquel',                  type: 'Ligero', defenseBonus: 1, cuerpoRequirement: 0, sigiloPenalty: null, cost: '10 L'  },
+      { name: 'Targe (Rodela Pequeña)',   type: 'Ligero', defenseBonus: 2, cuerpoRequirement: 1, sigiloPenalty: -1,  cost: '20 L'  },
+      { name: 'Escudo Redondo',           type: 'Medio',  defenseBonus: 2, cuerpoRequirement: 2, sigiloPenalty: -1,  cost: '30 L'  },
+      { name: 'Escudo Estándar',          type: 'Medio',  defenseBonus: 3, cuerpoRequirement: 3, sigiloPenalty: -2,  cost: '60 L'  },
+      { name: 'Escudo Grande (Pavés)',    type: 'Pesado', defenseBonus: 3, cuerpoRequirement: 4, sigiloPenalty: -3,  cost: '80 L'  },
+      { name: 'Escudo de Torre',          type: 'Pesado', defenseBonus: 4, cuerpoRequirement: 4, sigiloPenalty: -3,  cost: 'N/A'   },
+    ];
+
+    const createMap = (array, key) => array.reduce((acc, item) => { acc[item[key]] = item; return acc; }, {});
+    const ND_MAP       = createMap(CHALLENGE_RATINGS, 'nd');
+    const SIZE_MAP     = createMap(SIZES, 'name');
+    const CATEGORY_MAP = createMap(CATEGORIES, 'name');
+    const WEAPON_MAP   = createMap(ALL_WEAPONS, 'name');
+    const ARMOR_MAP    = createMap(ALL_ARMORS, 'name');
+    const SHIELD_MAP   = createMap(ALL_SHIELDS, 'name');
+
+    let uniqueIdCounter = 0;
+    const generateUniqueId = (prefix = 'id') => { uniqueIdCounter += 1; return `${prefix}-${Date.now()}-${uniqueIdCounter}`; };
+
+    const getTraitDisplayInfo = (trait) => {
+      let displayName = trait.name;
+      let displayDescription = trait.description;
+      if (trait.appliedData?.damageType) {
+        displayName = `${trait.name}: ${trait.appliedData.damageType}`;
+        displayDescription = displayDescription.replace('un tipo de daño', trait.appliedData.damageType);
+      } else if (trait.appliedData?.attribute) {
+        const attrName = trait.appliedData.attribute.charAt(0).toUpperCase() + trait.appliedData.attribute.slice(1);
+        if (trait.name === 'Mejora de Atributo')       { displayName = `${trait.name} (${attrName})`; displayDescription = `Aumenta ${attrName} en +1.`; }
+        else if (trait.name === 'Deficiencia de Atributo') { displayName = `Deficiencia de Atributo (${attrName})`; displayDescription = `Reduce ${attrName} en -1.`; }
+      } else if (trait.appliedData?.concepto) {
+        displayName = `${trait.name} (${trait.appliedData.concepto})`;
+        displayDescription = displayDescription.replace('un nuevo Concepto', `el concepto de ${trait.appliedData.concepto}`);
+      } else if (trait.appliedData?.nature) {
+        displayName = `${trait.name} (${trait.appliedData.nature})`;
+        displayDescription = displayDescription.replace('una nueva Naturaleza', `la naturaleza ${trait.appliedData.nature}`);
+      } else if (trait.appliedData?.movementType) {
+        displayName = `${trait.name} (${trait.appliedData.movementType})`;
+        displayDescription = displayDescription.replace('Nadar, Trepar o Excavar', trait.appliedData.movementType);
+      } else if (trait.appliedData?.statusEffect) {
+        displayName = `${trait.name} (${trait.appliedData.statusEffect})`;
+        if (trait.name === 'Estado añadido' || trait.name === 'Estado añadido Superior')
+          displayDescription = `Al impactar, el objetivo debe superar una Salvación de Aura (${trait.name === 'Estado añadido' ? 'ND 9' : 'ND 12'}) o sufrir el estado ${trait.appliedData.statusEffect}.`;
+        else if (trait.name === 'Inmunidad a estado')
+          displayDescription = `La criatura es inmune al estado ${trait.appliedData.statusEffect}.`;
+      } else if (trait.appliedData?.condition) {
+        displayName = `${trait.name} (${trait.appliedData.condition})`;
+        displayDescription = displayDescription.replace('una situación determinada', trait.appliedData.condition);
+      } else if (trait.appliedData?.field) {
+        displayName = `${trait.name} (${trait.appliedData.field})`;
+      } else if (trait.appliedData?.element) {
+        displayName = `${trait.name} (${trait.appliedData.element})`;
+        displayDescription = displayDescription.replace('un elemento concreto', trait.appliedData.element);
+      } else if (trait.appliedData?.stimulus) {
+        displayName = `${trait.name} (${trait.appliedData.stimulus})`;
+        displayDescription = displayDescription.replace('un estímulo concreto definido al crear la criatura', `el estímulo: ${trait.appliedData.stimulus}`);
+      }
+      return { displayName, displayDescription };
+    };
+
+    // ============================================================
+    // MODALES
+    // ============================================================
+    const SelectModal = ({ title, subtitle, options, isOpen, onClose, onConfirm }) => {
+      const [selected, setSelected] = useState(options[0]);
+      if (!isOpen) return null;
+      return (
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 animate-fade-in-fast" onClick={onClose}>
+          <div className="bg-stone-800 rounded-lg shadow-2xl border border-stone-600 w-full max-w-sm p-6 m-4 animate-fade-in" onClick={e => e.stopPropagation()}>
+            <h3 className="text-xl font-bold text-amber-400 mb-2 text-center font-display">{title}</h3>
+            {subtitle && <p className="text-stone-400 text-center mb-4 text-sm">{subtitle}</p>}
+            <select value={selected} onChange={e => setSelected(e.target.value)} className="w-full bg-stone-700 border border-stone-600 rounded-md py-2 px-3 text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-600 mb-6">
+              {options.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+            <div className="flex justify-end gap-3">
+              <button onClick={onClose} className="px-5 py-2 bg-stone-600 hover:bg-stone-500 text-stone-100 font-semibold rounded-lg transition-colors text-sm">Cancelar</button>
+              <button onClick={() => { onConfirm(selected); }} className="px-5 py-2 bg-amber-700 hover:bg-amber-600 text-stone-100 font-semibold rounded-lg transition-colors text-sm">Confirmar</button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const ExportOptionsModal = ({ isOpen, onClose, onConfirm }) => {
+      const [options, setOptions] = useState({ includeTraits: true, includeAttacks: true, format: 'full' });
+      if (!isOpen) return null;
+      return (
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 animate-fade-in-fast" onClick={onClose}>
+          <div className="bg-stone-800 rounded-lg shadow-2xl border border-stone-600 w-full max-w-md p-6 m-4 animate-fade-in" onClick={e => e.stopPropagation()}>
+            <h3 className="text-xl font-bold text-amber-400 mb-6 text-center font-display">Opciones de Exportación</h3>
+            <div className="space-y-5">
+              <div>
+                <p className="text-stone-300 font-semibold mb-2">Secciones</p>
+                {[['includeAttacks','Incluir Acciones y Ataques'],['includeTraits','Incluir Rasgos y Habilidades']].map(([k, label]) => (
+                  <label key={k} className="flex items-center gap-3 bg-stone-700/50 p-3 rounded-md cursor-pointer hover:bg-stone-700 mb-2">
+                    <input type="checkbox" checked={options[k]} onChange={e => setOptions(p => ({...p, [k]: e.target.checked}))} className="h-4 w-4"/>
+                    <span className="text-stone-200 text-sm">{label}</span>
+                  </label>
+                ))}
+              </div>
+              <div>
+                <p className="text-stone-300 font-semibold mb-2">Formato</p>
+                {[['full','Completo','Detallado'],['simple','Simple','Condensado']].map(([val, name, desc]) => (
+                  <label key={val} className="flex items-center gap-3 bg-stone-700/50 p-3 rounded-md cursor-pointer hover:bg-stone-700 mb-2">
+                    <input type="radio" name="format" value={val} checked={options.format === val} onChange={e => setOptions(p => ({...p, format: e.target.value}))} className="h-4 w-4"/>
+                    <div><span className="text-stone-200 text-sm font-medium">{name}</span><p className="text-xs text-stone-400">{desc}</p></div>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button onClick={onClose} className="px-5 py-2 bg-stone-600 hover:bg-stone-500 text-stone-100 font-semibold rounded-lg transition-colors text-sm">Cancelar</button>
+              <button onClick={() => onConfirm(options)} className="px-5 py-2 bg-lime-700 hover:bg-lime-600 text-stone-100 font-semibold rounded-lg transition-colors text-sm">Copiar Texto</button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================================
+    // STEP NAVIGATOR
+    // ============================================================
+    const steps = [
+      { number: 1, title: 'Concepto' }, { number: 2, title: 'Atributos' },
+      { number: 3, title: 'Rasgos'   }, { number: 4, title: 'Equipo'    },
+      { number: 5, title: 'Acciones' }, { number: 6, title: 'Ficha Final'}
+    ];
+
+    const StepNavigator = ({ currentStep, onStepClick }) => {
+      const pct = ((currentStep - 1) / (steps.length - 1)) * 100;
+      return (
+        <div className="w-full px-2 mb-10">
+          <div className="relative">
+            <div className="absolute top-5 left-0 w-full h-0.5 bg-stone-700 -translate-y-1/2"></div>
+            <div className="absolute top-5 left-0 h-0.5 bg-amber-600 -translate-y-1/2 transition-all duration-500" style={{width:`${pct}%`}}></div>
+            <ol className="relative flex justify-between items-start">
+              {steps.map(step => {
+                const isCompleted = currentStep > step.number;
+                const isCurrent   = currentStep === step.number;
+                return (
+                  <li key={step.number}>
+                    <button onClick={() => onStepClick(step.number)} className="flex flex-col items-center group focus:outline-none">
+                      <span className={`flex items-center justify-center rounded-full font-bold border-2 transition-all duration-300 ${isCurrent ? 'w-11 h-11 bg-amber-500 border-amber-400 text-white shadow-lg shadow-amber-900/50 scale-110 text-base' : isCompleted ? 'w-9 h-9 bg-amber-700 border-amber-600 text-white text-sm' : 'w-9 h-9 bg-stone-800 border-stone-600 text-stone-400 group-hover:border-amber-500 text-sm'}`}>
+                        {isCompleted ? '✓' : step.number}
+                      </span>
+                      <span className={`mt-2 text-xs font-semibold text-center w-16 transition-colors ${isCurrent ? 'text-amber-400' : 'text-stone-500 group-hover:text-amber-500'}`}>{step.title}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================================
+    // SAVE/LOAD MANAGER
+    // ============================================================
+    const SaveLoadManager = ({ creature, savedCreatures, onSave, onLoad, onDelete, onNew }) => {
+      const [isOpen, setIsOpen] = useState(false);
+      const dropdownRef = useRef(null);
+      useEffect(() => {
+        const handler = (e) => { if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setIsOpen(false); };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+      }, []);
+      return (
+        <div className="flex items-center gap-2">
+          <button onClick={onNew} className="px-4 py-2 bg-emerald-800 hover:bg-emerald-700 text-stone-100 font-semibold rounded-lg shadow transition-colors text-sm">Nueva</button>
+          <div className="relative" ref={dropdownRef}>
+            <button onClick={() => setIsOpen(p => !p)} className="px-4 py-2 bg-sky-800 hover:bg-sky-700 text-stone-100 font-semibold rounded-lg shadow transition-colors text-sm">Guardar / Cargar</button>
+            {isOpen && (
+              <div className="absolute right-0 mt-2 w-72 bg-stone-800 border border-stone-600 rounded-lg shadow-2xl z-50 animate-fade-in-fast">
+                <div className="p-3 border-b border-stone-700">
+                  <button onClick={() => { onSave(); setIsOpen(false); }} className="w-full px-4 py-2 bg-amber-700 hover:bg-amber-600 text-stone-100 font-semibold rounded-md transition-colors text-sm">{creature.id ? 'Actualizar Criatura' : 'Guardar Criatura'}</button>
+                </div>
+                <div className="p-3">
+                  <h4 className="text-stone-300 font-semibold mb-2 text-sm">Criaturas Guardadas</h4>
+                  <ul className="space-y-2 max-h-60 overflow-y-auto">
+                    {savedCreatures.length === 0
+                      ? <li className="text-stone-500 text-xs italic text-center py-2">No hay criaturas guardadas.</li>
+                      : savedCreatures.map(c => (
+                        <li key={c.id} className="bg-stone-700 p-2 rounded-md text-xs group">
+                          <div className="flex justify-between items-center">
+                            <span className="text-stone-200 font-medium truncate pr-2">{c.name} <span className="text-stone-400">(ND {c.nd})</span></span>
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => { onLoad(c.id); setIsOpen(false); }} className="px-2 py-1 bg-lime-700 hover:bg-lime-600 rounded text-white">Cargar</button>
+                              <button onClick={() => onDelete(c.id)} className="px-2 py-1 bg-red-800 hover:bg-red-700 rounded text-white">✕</button>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================================
+    // ATTRIBUTE EDITOR
+    // ============================================================
+    const AttributeEditor = ({ creature, onAttributeChange, onReset }) => {
+      const AttributeControl = ({ label, value, attr }) => (
+        <div className="flex items-center justify-between bg-stone-900 p-4 rounded-lg border border-stone-700">
+          <span className="text-lg font-semibold text-stone-300 font-display tracking-wide">{label}</span>
+          <div className="flex items-center gap-4">
+            <button onClick={() => onAttributeChange(attr, -1)} disabled={value <= -3} className="w-9 h-9 rounded-full bg-stone-700 hover:bg-stone-600 text-xl font-bold transition-colors disabled:opacity-30 disabled:cursor-not-allowed">−</button>
+            <span className="text-2xl font-bold text-amber-400 w-12 text-center font-mono">{value >= 0 ? `+${value}` : value}</span>
+            <button onClick={() => onAttributeChange(attr, 1)} className="w-9 h-9 rounded-full bg-stone-700 hover:bg-stone-600 text-xl font-bold transition-colors">+</button>
+          </div>
+        </div>
+      );
+      return (
+        <div className="max-w-md mx-auto space-y-5">
+          <div className="bg-stone-900/70 p-4 rounded-lg border border-stone-700 text-center text-sm text-stone-400">Aumentar un atributo cuesta <span className="text-amber-400 font-bold">2 PR</span>. Reducirlo otorga <span className="text-lime-400 font-bold">1 PR</span>. Mínimo <span className="text-red-400">−3</span>.</div>
+          <AttributeControl label="Cuerpo"    value={creature.attributes.cuerpo}    attr="cuerpo"    />
+          <AttributeControl label="Destreza"  value={creature.attributes.destreza}  attr="destreza"  />
+          <AttributeControl label="Aura"      value={creature.attributes.aura}      attr="aura"      />
+          <button onClick={onReset} className="w-full py-2 px-4 bg-stone-700 hover:bg-stone-600 text-stone-100 font-semibold rounded-lg transition-colors text-sm">Restablecer Atributos y Rasgos</button>
+        </div>
+      );
+    };
+
+// ============================================================
+    // TRAIT SELECTOR
+    // ============================================================
+    const TraitCard = ({ trait, onAdd, disabled }) => {
+      const cost = typeof trait.cost === 'number' ? `${trait.cost} PR` : `+${trait.cost.split(' ')[1]} PR`;
+      const costColor = typeof trait.cost === 'number' ? 'text-amber-400' : 'text-lime-400';
+      return (
+        <div className="bg-stone-900/60 p-3 rounded-lg border border-stone-700/50 flex flex-col justify-between hover:border-stone-600 transition-colors">
+          <div>
+            <div className="flex justify-between items-start mb-1">
+              <h4 className="font-bold text-stone-100 text-sm leading-tight pr-2">{trait.name}</h4>
+              <span className={`text-xs font-mono font-bold flex-shrink-0 ${costColor}`}>{cost}</span>
+            </div>
+            {trait.restriction && <p className="text-xs text-red-400 italic mb-1">Restricción: {trait.restriction}</p>}
+            <p className="text-xs text-stone-400 leading-relaxed">{trait.description}</p>
+          </div>
+          <button onClick={onAdd} disabled={disabled} className="mt-3 w-full bg-amber-800 hover:bg-amber-700 text-white font-semibold py-1.5 px-3 rounded-md text-xs disabled:bg-stone-700 disabled:text-stone-500 disabled:cursor-not-allowed transition-colors">Añadir</button>
+        </div>
+      );
+    };
+
+    const TraitSelector = ({ creature, addTrait, removeTrait }) => {
+      const [openCategory, setOpenCategory] = useState(null);
+      const [modalState, setModalState] = useState({ type: null, trait: null });
+
+      const basePr = useMemo(() => ND_MAP[creature.nd].pr, [creature.nd]);
+      const { prSpent, prGained } = useMemo(() => creature.traits.reduce((acc, t) => {
+        if (typeof t.cost === 'number') acc.prSpent += t.cost;
+        else if (typeof t.cost === 'string' && t.cost.startsWith('Gana')) acc.prGained += parseInt(t.cost.split(' ')[1], 10);
+        return acc;
+      }, { prSpent: 0, prGained: 0 }), [creature.traits]);
+      const prBudget    = basePr + prGained;
+      const prRemaining = prBudget - prSpent;
+
+      const groupedTraits = useMemo(() => {
+        return ALL_TRAITS
+          .filter(t => t.name !== 'Mejora de Atributo' && t.name !== 'Deficiencia de Atributo')
+          .reduce((acc, trait) => {
+            if (!acc[trait.category]) acc[trait.category] = [];
+            acc[trait.category].push(trait);
+            return acc;
+          }, {});
+      }, []);
+
+      const handleAddTraitClick = (trait) => {
+        // Restricción: Movimiento Lento máx 2 veces
+        if (trait.name === 'Movimiento Lento') {
+          const count = creature.traits.filter(t => t.name === 'Movimiento Lento').length;
+          if (count >= 2) return;
+        }
+        if (trait.name === 'Vulnerable' || trait.name === 'Resistente' || trait.name === 'Inmune' || trait.name === 'Absorción de Daño' || trait.name === 'Punto Débil')
+          setModalState({ type: 'damage', trait });
+        else if (trait.name === 'Inmunidad a estado' || trait.name === 'Estado añadido' || trait.name === 'Estado añadido Superior')
+          setModalState({ type: 'status', trait });
+        else if (trait.name === 'Versatilidad Conceptual')
+          setModalState({ type: 'concept', trait });
+        else if (trait.name === 'Versatilidad de Carácter')
+          setModalState({ type: 'nature', trait });
+        else if (trait.name === 'Movimiento Especial')
+          setModalState({ type: 'movement', trait });
+        else if (trait.name === 'Mejora de Atributo Condicionado')
+          setModalState({ type: 'condition', trait });
+        else if (trait.name === 'Especialista' || trait.name === 'Dotado')
+          setModalState({ type: 'field', trait });
+        else if (trait.name === 'Dependencia Elemental')
+          setModalState({ type: 'element', trait });
+        else if (trait.name === 'Instinto Compulsivo')
+          setModalState({ type: 'stimulus', trait });
+        else
+          addTrait(trait);
+      };
+
+      const confirmModal = (selected) => {
+        const { type, trait } = modalState;
+        let appliedData = {};
+        if (type === 'damage')    appliedData = { damageType: selected };
+        else if (type === 'status')    appliedData = { statusEffect: selected };
+        else if (type === 'concept')   appliedData = { concepto: selected };
+        else if (type === 'nature')    appliedData = { nature: selected };
+        else if (type === 'movement')  appliedData = { movementType: selected };
+        else if (type === 'condition') appliedData = { condition: selected };
+        else if (type === 'field')     appliedData = { field: selected };
+        else if (type === 'element')   appliedData = { element: selected };
+        else if (type === 'stimulus')  appliedData = { stimulus: selected };
+        addTrait({ ...trait, appliedData });
+        setModalState({ type: null, trait: null });
+      };
+
+      const STIMULUS_OPTIONS = [
+        'Comida o cadáveres frescos','Luz brillante o fuego','Sonido agudo o campanadas',
+        'Presencia de magia activa','Olor a sangre','Movimiento rápido','Criatura de su misma especie',
+        'Agua corriente','Oscuridad total','Personalizado'
+      ];
+
+      const modalOptions = {
+        damage:    { title: 'Tipo de Daño',          options: DAMAGE_TYPES },
+        status:    { title: 'Estado Alterado',        options: STATUS_EFFECTS },
+        concept:   { title: 'Concepto',               options: ALL_CONCEPTS },
+        nature:    { title: 'Naturaleza',             options: NATURES },
+        movement:  { title: 'Tipo de Movimiento',     options: MOVEMENT_TYPES },
+        condition: { title: 'Condición',              options: ['Bajo el agua','Con la mitad de resistencia o menos','Envenenado','Quemado','Asustado','En su territorio','De noche','Bajo los efectos de una técnica aliada','Personalizada'] },
+        field:     { title: 'Campo o Actividad',      options: ['Sigilo','Percepción','Supervivencia','Intimidación','Persuasión','Engaño','Atletismo','Acrobacias','Narrativa personalizada'] },
+        element:   { title: 'Elemento de Dependencia', options: ELEMENTS },
+        stimulus:  { title: 'Estímulo Compulsivo',    options: STIMULUS_OPTIONS },
+      };
+      const currentModal = modalState.type ? modalOptions[modalState.type] : null;
+
+      return (
+        <>
+          {currentModal && (
+            <SelectModal
+              isOpen={!!modalState.type}
+              title={`Seleccionar ${currentModal.title} para "${modalState.trait?.name}"`}
+              options={currentModal.options}
+              onClose={() => setModalState({ type: null, trait: null })}
+              onConfirm={confirmModal}
+            />
+          )}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-2">
+              {Object.entries(groupedTraits).map(([category, traits]) => {
+                const isOpen = openCategory === category;
+                const isDisadvantage = category === 'Rasgos de Desventaja';
+                return (
+                  <div key={category} className={`border rounded-lg overflow-hidden ${isDisadvantage ? 'border-red-900/60' : 'border-stone-700'}`}>
+                    <button onClick={() => setOpenCategory(isOpen ? null : category)} className={`w-full flex justify-between items-center p-4 transition-colors ${isDisadvantage ? 'bg-red-950/40 hover:bg-red-950/60' : 'bg-stone-800 hover:bg-stone-750'}`}>
+                      <h4 className={`text-base font-semibold font-display ${isDisadvantage ? 'text-red-400' : 'text-amber-500'}`}>
+                        {category}{isDisadvantage ? ' 🔻' : ''}
+                      </h4>
+                      <span className={`text-stone-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>▼</span>
+                    </button>
+                    {isOpen && (
+                      <div className="p-4 border-t border-stone-700/50 bg-stone-800/50 animate-fade-in">
+                        {isDisadvantage && (
+                          <p className="text-xs text-red-400/80 italic mb-3 px-1">Estos rasgos otorgan Puntos de Rasgo adicionales a cambio de penalizaciones permanentes.</p>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {traits.map(trait => {
+                            let isDisabled = false;
+                            if (typeof trait.cost === 'number') isDisabled = prRemaining < trait.cost;
+                            if (trait.name === 'Movimiento Lento') {
+                              const cnt = creature.traits.filter(t => t.name === 'Movimiento Lento').length;
+                              if (cnt >= 2) isDisabled = true;
+                            }
+                            return <TraitCard key={trait.name} trait={trait} onAdd={() => handleAddTraitClick(trait)} disabled={isDisabled} />;
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="lg:col-span-1">
+              <div className="sticky top-4 space-y-4">
+                <div className="bg-stone-900 p-4 rounded-lg border border-stone-700">
+                  <h3 className="text-lg font-bold text-stone-100 mb-3 text-center font-display">Presupuesto</h3>
+                  <div className="flex justify-between items-center bg-stone-800 p-3 rounded-md mb-1">
+                    <span className="text-stone-300 text-sm font-semibold">Puntos de Rasgo</span>
+                    <span className="text-2xl font-bold text-amber-400 font-mono">{prRemaining}<span className="text-sm text-stone-400">/{prBudget}</span></span>
+                  </div>
+                  <p className="text-xs text-stone-500 text-center">Base: {basePr} · Ganados: {prGained} · Gastados: {prSpent}</p>
+                </div>
+                <div className="bg-stone-900 p-4 rounded-lg border border-stone-700">
+                  <h3 className="text-lg font-bold text-stone-100 mb-3 font-display">Rasgos Seleccionados</h3>
+                  <div className="space-y-1.5 max-h-80 overflow-y-auto">
+                    {creature.traits.length === 0
+                      ? <p className="text-stone-500 italic text-sm">Ningún rasgo añadido.</p>
+                      : creature.traits.map(trait => {
+                          const isAttr = trait.name === 'Mejora de Atributo' || trait.name === 'Deficiencia de Atributo';
+                          const isCat  = trait.isCategoryAbility;
+                          const isDisadv = trait.category === 'Rasgos de Desventaja';
+                          let displayName = trait.name;
+                          if (trait.appliedData?.damageType)    displayName = `${trait.name} (${trait.appliedData.damageType})`;
+                          else if (trait.appliedData?.attribute)     displayName = `${trait.name} (${trait.appliedData.attribute})`;
+                          else if (trait.appliedData?.concepto)      displayName = `${trait.name} (${trait.appliedData.concepto})`;
+                          else if (trait.appliedData?.nature)        displayName = `${trait.name} (${trait.appliedData.nature})`;
+                          else if (trait.appliedData?.movementType)  displayName = `${trait.name} (${trait.appliedData.movementType})`;
+                          else if (trait.appliedData?.statusEffect)  displayName = `${trait.name} (${trait.appliedData.statusEffect})`;
+                          else if (trait.appliedData?.condition)     displayName = `${trait.name} (${trait.appliedData.condition})`;
+                          else if (trait.appliedData?.field)         displayName = `${trait.name} (${trait.appliedData.field})`;
+                          else if (trait.appliedData?.element)       displayName = `${trait.name} (${trait.appliedData.element})`;
+                          else if (trait.appliedData?.stimulus)      displayName = `${trait.name} (${trait.appliedData.stimulus})`;
+                          return (
+                            <div key={trait.instanceId} className={`flex justify-between items-center p-2 rounded text-xs ${isCat ? 'bg-amber-900/30 border border-amber-800/40' : isDisadv ? 'bg-red-950/40 border border-red-900/30' : 'bg-stone-800'}`}>
+                              <span className={`truncate pr-2 flex-1 ${isDisadv ? 'text-red-300' : 'text-stone-300'}`}>
+                                {displayName}
+                                {isCat && <span className="text-amber-600 ml-1">(categoría)</span>}
+                                {isDisadv && <span className="text-lime-500 ml-1">+PR</span>}
+                              </span>
+                              <button onClick={() => removeTrait(trait.instanceId)} disabled={isAttr || isCat} className="text-red-600 hover:text-red-400 font-bold disabled:text-stone-700 disabled:cursor-not-allowed">✕</button>
+                            </div>
+                          );
+                        })
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      );
+    };
+
+    // ============================================================
+    // EQUIPMENT SELECTOR
+    // ============================================================
+    const bonusOptions = [-3,-2,-1,0,1,2,3,4,5];
+    const EquipmentSelector = ({ creature, onAddWeapon, onRemoveWeapon, onWeaponBonusChange, onArmorShieldChange, onEquipmentBonusChange }) => {
+      const [selectedWeapon, setSelectedWeapon] = useState(ALL_WEAPONS[0].name);
+      const getNameWithBonus = (item, type) => { const b = item.bonus; return b === 0 ? item[type].name : `${item[type].name} ${b > 0 ? '+' : ''}${b}`; };
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div>
+            <h3 className="text-lg font-semibold text-stone-100 mb-3 font-display">Armas Equipadas</h3>
+            <div className="space-y-2 mb-3 p-2 bg-stone-900/50 rounded-lg border border-stone-700 min-h-20 max-h-56 overflow-y-auto">
+              {creature.equippedWeapons.length > 0
+                ? creature.equippedWeapons.map((ew, i) => (
+                  <div key={i} className="bg-stone-800 p-2 rounded">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-sm text-stone-200 font-semibold">{getNameWithBonus(ew, 'weapon')}</p>
+                        <p className="text-xs text-stone-400">{ew.weapon.damage} {ew.weapon.damageType}</p>
+                      </div>
+                      <button onClick={() => onRemoveWeapon(i)} className="text-red-600 hover:text-red-400 font-bold">✕</button>
+                    </div>
+                    <div className="mt-1">
+                      <label className="text-xs text-stone-400 mr-2">Bono:</label>
+                      <select value={ew.bonus} onChange={e => onWeaponBonusChange(i, parseInt(e.target.value))} className="bg-stone-700 border border-stone-600 rounded py-0.5 px-1.5 text-stone-100 text-xs">
+                        {bonusOptions.map(b => <option key={b} value={b}>{b >= 0 ? `+${b}` : b}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                ))
+                : <p className="text-stone-500 text-sm italic text-center pt-3">Ninguna equipada.</p>
+              }
+            </div>
+            <select value={selectedWeapon} onChange={e => setSelectedWeapon(e.target.value)} className="w-full bg-stone-700 border border-stone-600 rounded-md py-2 px-3 text-stone-100 text-sm mb-2">
+              {ALL_WEAPONS.map(w => <option key={w.name} value={w.name}>{w.name}</option>)}
+            </select>
+            <button onClick={() => onAddWeapon(selectedWeapon)} className="w-full py-2 bg-amber-700 hover:bg-amber-600 text-stone-100 font-semibold rounded-lg text-sm transition-colors">Añadir Arma</button>
+          </div>
+          {[['armor','Armadura',ALL_ARMORS],['shield','Escudo',ALL_SHIELDS]].map(([type, label, items]) => (
+            <div key={type}>
+              <h3 className="text-lg font-semibold text-stone-100 mb-3 font-display">{label}</h3>
+              <select
+                value={creature[type === 'armor' ? 'equippedArmor' : 'equippedShield']?.[type]?.name || 'Ninguno'}
+                onChange={e => onArmorShieldChange(type, e.target.value)}
+                className="w-full bg-stone-700 border border-stone-600 rounded-md py-2 px-3 text-stone-100 text-sm mb-2"
+              >
+                <option value="Ninguno">Ninguno</option>
+                {items.map(a => (
+                  <option key={a.name} value={a.name} disabled={creature.attributes.cuerpo < a.cuerpoRequirement}>
+                    {a.name}{creature.attributes.cuerpo < a.cuerpoRequirement ? ` (Req. Cuerpo +${a.cuerpoRequirement})` : ''}
+                  </option>
+                ))}
+              </select>
+              {creature[type === 'armor' ? 'equippedArmor' : 'equippedShield'] && (() => {
+                const equipped = creature[type === 'armor' ? 'equippedArmor' : 'equippedShield'];
+                const item = equipped[type];
+                return (
+                  <div className="p-3 bg-stone-900/50 rounded-lg border border-stone-700 text-xs space-y-1.5">
+                    <div>
+                      <label className="text-stone-400 mr-2">Bono:</label>
+                      <select value={equipped.bonus} onChange={e => onEquipmentBonusChange(type, parseInt(e.target.value))} className="bg-stone-700 border border-stone-600 rounded py-0.5 px-1.5 text-stone-100 text-xs">
+                        {bonusOptions.map(b => <option key={b} value={b}>{b >= 0 ? `+${b}` : b}</option>)}
+                      </select>
+                    </div>
+                    <p><span className="text-stone-400">Bono Base: </span>+{item.defenseBonus}</p>
+                    <p><span className="text-stone-400">Req. Cuerpo: </span>+{item.cuerpoRequirement}</p>
+                  </div>
+                );
+              })()}
+            </div>
+          ))}
+        </div>
+      );
+    };
+
+    // ============================================================
+    // ACTION EDITOR
+    // ============================================================
+    const ActionEditor = ({ creature, addAttack, removeAttack, reorderAttacks }) => {
+      const getDefaultAttack = useCallback(() => {
+        const base = ND_MAP[creature.nd];
+        const diceMatch = base.danoBase.match(/(\d+d\d+)/);
+        const modMatch  = base.danoBase.match(/([+-])\s*(\d+)/);
+        return {
+          name: 'Ataque Básico', type: 'Melee', attribute: 'cuerpo',
+          damageDice: diceMatch ? diceMatch[0] : '1d6',
+          damageModifier: modMatch ? (modMatch[1] === '+' ? parseInt(modMatch[2]) : -parseInt(modMatch[2])).toString() : '0',
+          damageType: 'Contundente', description: '', range: ''
+        };
+      }, [creature.nd]);
+
+      const [newAttack, setNewAttack] = useState(getDefaultAttack);
+      useEffect(() => { setNewAttack(getDefaultAttack()); }, [creature.nd, getDefaultAttack]);
+      const dragIndex = useRef(null);
+      const [dragOver, setDragOver] = useState(null);
+
+      const attributeBonus = creature.attributes[newAttack.attribute] || 0;
+      const totalMod = attributeBonus + (parseInt(newAttack.damageModifier) || 0);
+      const modStr = totalMod === 0 ? '' : totalMod > 0 ? ` + ${totalMod}` : ` - ${Math.abs(totalMod)}`;
+
+      const handleAdd = () => {
+        addAttack({
+          name: newAttack.name, type: newAttack.type, attribute: newAttack.attribute,
+          damageDice: newAttack.damageDice, damageModifier: parseInt(newAttack.damageModifier) || 0,
+          damageType: newAttack.damageType, description: newAttack.description,
+          ...(newAttack.type === 'Ranged' && newAttack.range ? { range: newAttack.range } : {})
+        });
+        setNewAttack(getDefaultAttack());
+      };
+
+      const inputCls = "w-full bg-stone-700 border border-stone-600 rounded-md py-2 px-3 text-stone-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-600";
+      const labelCls = "block text-sm font-medium text-stone-300 mb-1";
+
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-stone-100 font-display">Nuevo Ataque</h3>
+            <div><label className={labelCls}>Nombre</label><input type="text" value={newAttack.name} onChange={e => setNewAttack(p=>({...p,name:e.target.value}))} className={inputCls}/></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className={labelCls}>Tipo</label><select value={newAttack.type} onChange={e => setNewAttack(p=>({...p,type:e.target.value}))} className={inputCls}><option value="Melee">Melee</option><option value="Ranged">Ranged</option></select></div>
+              <div><label className={labelCls}>Atributo</label><select value={newAttack.attribute} onChange={e => setNewAttack(p=>({...p,attribute:e.target.value}))} className={inputCls}><option value="cuerpo">Cuerpo</option><option value="destreza">Destreza</option></select></div>
+            </div>
+            {newAttack.type === 'Ranged' && <div><label className={labelCls}>Rango</label><input type="text" value={newAttack.range} onChange={e => setNewAttack(p=>({...p,range:e.target.value}))} placeholder="ej. 15/30m" className={inputCls}/></div>}
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className={labelCls}>Dados</label><input type="text" value={newAttack.damageDice} onChange={e => setNewAttack(p=>({...p,damageDice:e.target.value}))} className={inputCls}/></div>
+              <div><label className={labelCls}>Daño Extra</label><input type="number" value={newAttack.damageModifier} onChange={e => setNewAttack(p=>({...p,damageModifier:e.target.value}))} className={inputCls}/></div>
+            </div>
+            <div><label className={labelCls}>Tipo de Daño</label><select value={newAttack.damageType} onChange={e => setNewAttack(p=>({...p,damageType:e.target.value}))} className={inputCls}>{DAMAGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+            <div><label className={labelCls}>Descripción / Efectos</label><textarea value={newAttack.description} onChange={e => setNewAttack(p=>({...p,description:e.target.value}))} rows={2} className={inputCls}/></div>
+            <div className="bg-stone-900/60 p-3 rounded-lg border border-stone-700 text-sm">
+              <p className="text-amber-400 font-bold text-center mb-2">Vista Previa</p>
+              <div className="flex justify-between"><span className="text-stone-400">Bono Ataque:</span><span className="font-mono font-bold text-stone-100">{attributeBonus >= 0 ? '+' : ''}{attributeBonus}</span></div>
+              <div className="flex justify-between"><span className="text-stone-400">Daño Final:</span><span className="font-mono font-bold text-stone-100">{newAttack.damageDice}{modStr} {newAttack.damageType}</span></div>
+            </div>
+            <button onClick={handleAdd} className="w-full py-2 bg-amber-700 hover:bg-amber-600 text-stone-100 font-semibold rounded-lg transition-colors">Añadir Ataque</button>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-stone-100 mb-3 font-display">Lista de Acciones</h3>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {creature.attacks.length === 0
+                ? <p className="text-stone-500 italic text-center pt-6">Sin ataques añadidos.</p>
+                : creature.attacks.map((attack, i) => {
+                    const bonus = creature.attributes[attack.attribute] || 0;
+                    const mod   = bonus + attack.damageModifier;
+                    const ms    = mod === 0 ? '' : mod > 0 ? ` + ${mod}` : ` - ${Math.abs(mod)}`;
+                    return (
+                      <div key={i}
+                        draggable
+                        onDragStart={() => { dragIndex.current = i; }}
+                        onDragEnter={() => { if (dragIndex.current !== null && dragIndex.current !== i) setDragOver(i); }}
+                        onDragOver={e => e.preventDefault()}
+                        onDragEnd={() => { dragIndex.current = null; setDragOver(null); }}
+                        onDrop={() => { if (dragIndex.current !== null && dragIndex.current !== i) reorderAttacks(dragIndex.current, i); setDragOver(null); }}
+                        className={`bg-stone-900/70 p-3 rounded-lg border relative flex gap-2 items-center transition-all cursor-grab ${dragOver === i ? 'border-amber-500 shadow-lg' : 'border-stone-700'}`}
+                      >
+                        <span className="text-stone-500 text-lg">⠿</span>
+                        <div className="flex-grow pr-6">
+                          <p className="text-stone-100 font-bold text-sm">{attack.name} <span className="text-xs font-normal text-stone-400">({attack.type})</span></p>
+                          <p className="text-xs text-stone-300 font-mono">Ataque: {bonus >= 0 ? '+' : ''}{bonus} · Daño: {attack.damageDice}{ms} {attack.damageType}</p>
+                          {attack.description && <p className="text-xs text-stone-400 italic mt-0.5">{attack.description}</p>}
+                        </div>
+                        <button onClick={() => removeAttack(i)} className="absolute top-2 right-2 text-red-600 hover:text-red-400 font-bold">✕</button>
+                      </div>
+                    );
+                  })
+              }
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ============================================================
+    // CREATURE SHEET
+    // ============================================================
+    const TraitItem = ({ trait, count }) => {
+      const { displayName, displayDescription } = getTraitDisplayInfo(trait);
+      let finalName = displayName;
+      if (count > 1) { const m = displayName.match(/\(([^)]+)\)/); finalName = m ? displayName.replace(m[0], `(${m[1]} x${count})`) : `${displayName} (x${count})`; }
+      return (
+        <li className="py-0.5">
+          <span className="font-semibold text-amber-400">{finalName}.</span>{' '}
+          <span className="text-stone-300">{displayDescription}</span>
+        </li>
+      );
+    };
+
+    const CreatureSheet = ({ creature }) => {
+      const [copyText, setCopyText] = useState('Exportar Texto');
+      const [imgText,  setImgText]  = useState('Exportar Imagen');
+      const [exportOpen, setExportOpen] = useState(false);
+      const sheetRef = useRef(null);
+
+      const baseStats  = useMemo(() => ND_MAP[creature.nd], [creature.nd]);
+      const sizeMods   = useMemo(() => SIZE_MAP[creature.size], [creature.size]);
+      const categoryTrait = useMemo(() => creature.traits.find(t => t.isCategoryAbility), [creature.traits]);
+      const concepts   = useMemo(() => creature.traits.filter(t => t.name === 'Versatilidad Conceptual' && t.appliedData?.concepto).map(t => t.appliedData.concepto), [creature.traits]);
+      const allNatures = useMemo(() => { const extra = creature.traits.filter(t => t.name === 'Versatilidad de Carácter' && t.appliedData?.nature).map(t => t.appliedData.nature); return [...creature.natures, ...extra]; }, [creature.natures, creature.traits]);
+      const fullCategory = useMemo(() => { const parts = [creature.category, ...concepts].join(' '); return creature.label ? `${parts} (${creature.label})` : parts; }, [creature.category, concepts, creature.label]);
+
+      // ---- CÁLCULOS CON RASGOS DE DESVENTAJA APLICADOS ----
+      const vitalidadAumentada  = useMemo(() => creature.traits.filter(t => t.name === 'Vitalidad Aumentada').length,  [creature.traits]);
+      const vitalidadMermada    = useMemo(() => creature.traits.filter(t => t.name === 'Vitalidad Mermada').length,    [creature.traits]);
+      const defensaFragil       = useMemo(() => creature.traits.filter(t => t.name === 'Defensa Frágil').length,       [creature.traits]);
+      const movimientoLento     = useMemo(() => creature.traits.filter(t => t.name === 'Movimiento Lento').length,     [creature.traits]);
+      const lentitudReactiva    = useMemo(() => creature.traits.some(t => t.name === 'Lentitud Reactiva'),             [creature.traits]);
+
+      const finalResistencia = useMemo(() =>
+        Math.max(1, baseStats.resistencia + sizeMods.modResistencia + vitalidadAumentada * 10 - vitalidadMermada * 10),
+        [baseStats, sizeMods, vitalidadAumentada, vitalidadMermada]);
+
+      const finalDefensa = useMemo(() =>
+        baseStats.defensa
+        + sizeMods.modDefensa
+        + creature.traits.filter(t => t.name === 'Armadura Natural').length
+        + (creature.equippedArmor?.armor.defenseBonus  || 0)
+        + (creature.equippedArmor?.bonus               || 0)
+        + (creature.equippedShield?.shield.defenseBonus || 0)
+        + (creature.equippedShield?.bonus              || 0)
+        - defensaFragil * 2,
+        [baseStats, sizeMods, creature.traits, creature.equippedArmor, creature.equippedShield, defensaFragil]);
+
+      const finalIniciativa = useMemo(() =>
+        (creature.attributes.destreza + creature.attributes.aura) - 2
+        + creature.traits.filter(t => t.name === 'Iniciativa Mejorada').length * 3,
+        [creature.attributes, creature.traits]);
+
+      const movementDisplay = useMemo(() => {
+        const land = Math.max(0, 9 + creature.attributes.destreza
+          + creature.traits.filter(t => t.name === 'Velocidad Mejorada').length * 3
+          - movimientoLento * 3);
+        const special = new Set();
+        creature.traits.forEach(t => {
+          if (t.name === 'Vuelo') special.add(`Vuelo ${land}m`);
+          if (t.name === 'Movimiento Especial' && t.appliedData?.movementType) special.add(`${t.appliedData.movementType} ${land}m`);
+        });
+        return [`${land}m`, ...Array.from(special)].join(', ');
+      }, [creature.attributes.destreza, creature.traits, movimientoLento]);
+
+      const getEqNameWithBonus = (item, type) => item.bonus === 0 ? item[type].name : `${item[type].name} ${item.bonus > 0 ? '+' : ''}${item.bonus}`;
+
+      const finalAttacks = useMemo(() => {
+        const wa = creature.equippedWeapons.map(ew => {
+          const { weapon, bonus } = ew;
+          const usesDex = weapon.properties.some(p => p.name === 'Ligera');
+          const attr  = usesDex ? 'destreza' : 'cuerpo';
+          const parts = weapon.damage.split(/([+-])/).map(s => s.trim());
+          const dice  = parts[0];
+          const baseMod = parts.length > 1 ? parseInt(parts[1] + parts[2]) : 0;
+          return {
+            name: getEqNameWithBonus(ew, 'weapon'),
+            type: weapon.category.includes('Dist.') ? 'Ranged' : 'Melee',
+            attribute: attr, damageDice: dice, damageModifier: baseMod + bonus,
+            damageType: weapon.damageType,
+            description: weapon.properties.map(p => p.details ? `${p.name} (${p.details})` : p.name).join(', ')
+          };
+        });
+        return [...wa, ...creature.attacks];
+      }, [creature.equippedWeapons, creature.attacks]);
+
+      const { vulnerabilities, resistances, immunities, statusImmunities, weaknesses, otherTraits } = useMemo(() => {
+        const v = [], r = [], im = [], si = [], wk = [];
+        const oc = new Map();
+        creature.traits.filter(t => !t.isCategoryAbility).forEach(trait => {
+          if      (trait.name === 'Vulnerable'       && trait.appliedData?.damageType) v.push(trait.appliedData.damageType);
+          else if (trait.name === 'Resistente'        && trait.appliedData?.damageType) r.push(trait.appliedData.damageType);
+          else if (trait.name === 'Inmune'            && trait.appliedData?.damageType) im.push(trait.appliedData.damageType);
+          else if (trait.name === 'Inmunidad a estado'&& trait.appliedData?.statusEffect) si.push(trait.appliedData.statusEffect);
+          else if (trait.name === 'Punto Débil'       && trait.appliedData?.damageType) wk.push(trait.appliedData.damageType);
+          else {
+            const key = `${trait.name}|${JSON.stringify(trait.appliedData ?? {})}`;
+            oc.has(key) ? oc.get(key).count++ : oc.set(key, { trait, count: 1 });
+          }
+        });
+        return { vulnerabilities: v, resistances: r, immunities: im, statusImmunities: si, weaknesses: wk, otherTraits: Array.from(oc.values()) };
+      }, [creature.traits]);
+
+      const copyToClipboard = (text) => {
+        try {
+          navigator.clipboard.writeText(text).then(() => { setCopyText('¡Copiado!'); setTimeout(() => setCopyText('Exportar Texto'), 2000); });
+        } catch {
+          const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+          setCopyText('¡Copiado!'); setTimeout(() => setCopyText('Exportar Texto'), 2000);
+        }
+      };
+
+      const handleConfirmExport = (options) => {
+        const equipList = [...creature.equippedWeapons.map(w => getEqNameWithBonus(w, 'weapon')), creature.equippedArmor ? getEqNameWithBonus(creature.equippedArmor, 'armor') : null, creature.equippedShield ? getEqNameWithBonus(creature.equippedShield, 'shield') : null].filter(Boolean).join(', ');
+        let txt = '';
+        if (options.format === 'simple') {
+          txt += `${creature.name.toUpperCase()} (ND ${creature.nd})\nRes: ${finalResistencia}, Def: ${finalDefensa}, Ini: ${finalIniciativa >= 0 ? '+' : ''}${finalIniciativa}${lentitudReactiva ? ' (siempre último)' : ''}, Mov: ${movementDisplay}\nCuerpo: ${creature.attributes.cuerpo > 0 ? '+' : ''}${creature.attributes.cuerpo}, Destreza: ${creature.attributes.destreza > 0 ? '+' : ''}${creature.attributes.destreza}, Aura: ${creature.attributes.aura > 0 ? '+' : ''}${creature.attributes.aura}\n`;
+          if (options.includeAttacks && finalAttacks.length > 0) {
+            const at = finalAttacks.map(a => { const ab = creature.attributes[a.attribute]; const tm = ab + a.damageModifier; const ms = tm === 0 ? '' : tm > 0 ? ` + ${tm}` : ` - ${Math.abs(tm)}`; return `${a.name} (${ab >= 0 ? '+' : ''}${ab}, ${a.damageDice}${ms} ${a.damageType})`; }).join('; ');
+            txt += `Ataques: ${at}\n`;
+          }
+          if (options.includeTraits) {
+            const tl = [];
+            if (categoryTrait) tl.push(categoryTrait.name);
+            otherTraits.forEach(({ trait, count }) => { const { displayName } = getTraitDisplayInfo(trait); tl.push(`${displayName}${count > 1 ? ` (x${count})` : ''}`); });
+            if (tl.length) txt += `Rasgos: ${tl.join(', ')}\n`;
+          }
+        } else {
+          txt += `${creature.name.toUpperCase()}\n${creature.size} ${fullCategory} (ND ${creature.nd})\n------------------------------------\nResistencia: ${finalResistencia}\nDefensa: ${finalDefensa}\nIniciativa: ${finalIniciativa >= 0 ? '+' : ''}${finalIniciativa}${lentitudReactiva ? ' (actúa siempre en último lugar)' : ''}\nMovimiento: ${movementDisplay}\n`;
+          if (vulnerabilities.length)  txt += `Vulnerable a: ${vulnerabilities.join(', ')}\n`;
+          if (weaknesses.length)       txt += `Punto Débil (ignora resistencias): ${weaknesses.join(', ')}\n`;
+          if (resistances.length)      txt += `Resistente a: ${resistances.join(', ')}\n`;
+          if (immunities.length)       txt += `Inmune a: ${immunities.join(', ')}\n`;
+          if (statusImmunities.length) txt += `Inmune a Estados: ${statusImmunities.join(', ')}\n`;
+          if (equipList)               txt += `Equipo: ${equipList}\n`;
+          txt += `Naturaleza: ${allNatures.join(', ')}.\n------------------------------------\nCuerpo: ${creature.attributes.cuerpo > 0 ? '+' : ''}${creature.attributes.cuerpo} | Destreza: ${creature.attributes.destreza > 0 ? '+' : ''}${creature.attributes.destreza} | Aura: ${creature.attributes.aura > 0 ? '+' : ''}${creature.attributes.aura}\n`;
+          if (options.includeAttacks && finalAttacks.length) {
+            txt += `------------------------------------\nACCIONES\n`;
+            finalAttacks.forEach(a => { const ab = creature.attributes[a.attribute]; const tm = ab + a.damageModifier; const ms = tm === 0 ? '' : tm > 0 ? ` + ${tm}` : ` - ${Math.abs(tm)}`; txt += `* ${a.name}. Ataque de ${a.type}: ${ab >= 0 ? '+' : ''}${ab} a golpear. Impacto: ${a.damageDice}${ms} de daño ${a.damageType}.\n`; if (a.description) txt += `  ${a.description}\n`; });
+          }
+          if (options.includeTraits && (categoryTrait || otherTraits.length)) {
+            txt += `------------------------------------\nRASGOS E HABILIDADES\n`;
+            if (categoryTrait) txt += `* ${categoryTrait.name}. ${categoryTrait.description}\n`;
+            otherTraits.forEach(({ trait, count }) => { const { displayName, displayDescription } = getTraitDisplayInfo(trait); let fn = displayName; if (count > 1) { const m = displayName.match(/\(([^)]+)\)/); fn = m ? displayName.replace(m[0], `(${m[1]} x${count})`) : `${displayName} (x${count})`; } txt += `* ${fn}. ${displayDescription}\n`; });
+          }
+        }
+        copyToClipboard(txt.trim());
+        setExportOpen(false);
+      };
+
+      const handleExportImage = async () => {
+        if (!sheetRef.current || typeof window.html2canvas === 'undefined') { setImgText('Error'); setTimeout(() => setImgText('Exportar Imagen'), 2000); return; }
+        setImgText('Generando...');
+        try {
+          const canvas = await window.html2canvas(sheetRef.current, { backgroundColor: '#0c0a09', scale: 2 });
+          const link = document.createElement('a');
+          link.download = `${creature.name.toLowerCase().replace(/\s+/g,'-')}-sheet.png`;
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+          setImgText('¡Descargado!');
+        } catch { setImgText('Error'); }
+        finally { setTimeout(() => setImgText('Exportar Imagen'), 2000); }
+      };
+
+      const equipList = [...creature.equippedWeapons.map(w => getEqNameWithBonus(w, 'weapon')), creature.equippedArmor ? getEqNameWithBonus(creature.equippedArmor, 'armor') : null, creature.equippedShield ? getEqNameWithBonus(creature.equippedShield, 'shield') : null].filter(Boolean).join(', ');
+      const fmtBonus = (n) => (n >= 0 ? `+${n}` : `${n}`);
+
+      return (
+        <>
+          <ExportOptionsModal isOpen={exportOpen} onClose={() => setExportOpen(false)} onConfirm={handleConfirmExport}/>
+          <div ref={sheetRef} className="bg-stone-950 font-body text-stone-300 rounded-lg border-2 border-stone-700 shadow-2xl overflow-hidden">
+            <div className="p-6 bg-gradient-to-r from-stone-900 via-stone-800 to-stone-900 border-b-2 border-amber-900/50">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h2 className="text-4xl font-bold text-amber-400 tracking-wider font-display">{creature.name}</h2>
+                  <p className="text-stone-400 italic text-base mt-1">{creature.size} {fullCategory}</p>
+                </div>
+                <div className="text-center flex-shrink-0 ml-4 bg-stone-950/50 rounded-lg px-4 py-2 border border-stone-700">
+                  <div className="text-xs font-bold text-stone-400 tracking-widest">ND</div>
+                  <div className="text-3xl font-bold text-amber-500 font-display">{creature.nd}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row">
+              <div className="w-full md:w-1/3 bg-stone-900/40 p-5 md:border-r-2 md:border-stone-700/50">
+                <div className="space-y-5">
+                  <div className="grid grid-cols-2 gap-3 text-center">
+                    {[['RESISTENCIA', finalResistencia, 'text-red-400'],['DEFENSA', finalDefensa, 'text-sky-400']].map(([lbl, val, cls]) => (
+                      <div key={lbl} className="bg-stone-800/60 rounded-lg p-3">
+                        <div className="text-xs font-bold text-stone-400 tracking-widest mb-1">{lbl}</div>
+                        <div className={`text-5xl font-bold ${cls} font-display`}>{val}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-center bg-stone-800/60 rounded-lg p-3">
+                    <div className="text-xs font-bold text-stone-400 tracking-widest mb-1">NATURALEZA</div>
+                    <div className="text-base font-bold text-stone-100 capitalize">{allNatures.join(', ')}</div>
+                  </div>
+                  <hr className="border-stone-700"/>
+                  <div className="space-y-2">
+                    {[['CUERPO', creature.attributes.cuerpo],['DESTREZA', creature.attributes.destreza],['AURA', creature.attributes.aura]].map(([lbl, val]) => (
+                      <div key={lbl} className="flex justify-between items-center bg-stone-800 px-4 py-2 rounded-md">
+                        <span className="text-sm font-bold text-stone-400 tracking-wide">{lbl}</span>
+                        <span className="text-xl font-bold text-stone-100 font-mono">{fmtBonus(val)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <hr className="border-stone-700"/>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-stone-400">Iniciativa</span>
+                      <span className="font-bold text-amber-400 font-mono">
+                        {fmtBonus(finalIniciativa)}
+                        {lentitudReactiva && <span className="text-xs text-red-400 ml-1">(último)</span>}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-stone-400">Movimiento</span>
+                      <span className="font-bold text-lime-400 text-xs text-right max-w-28">{movementDisplay}</span>
+                    </div>
+                    {vulnerabilities.length > 0   && <div className="flex justify-between"><span className="text-stone-400">Vulnerable</span><span className="font-semibold text-red-400 text-xs text-right">{vulnerabilities.join(', ')}</span></div>}
+                    {weaknesses.length > 0         && <div className="flex justify-between"><span className="text-stone-400">Punto Débil</span><span className="font-semibold text-orange-400 text-xs text-right">{weaknesses.join(', ')}</span></div>}
+                    {resistances.length > 0        && <div className="flex justify-between"><span className="text-stone-400">Resistente</span><span className="font-semibold text-sky-300 text-xs text-right">{resistances.join(', ')}</span></div>}
+                    {immunities.length > 0         && <div className="flex justify-between"><span className="text-stone-400">Inmune</span><span className="font-semibold text-amber-300 text-xs text-right">{immunities.join(', ')}</span></div>}
+                    {statusImmunities.length > 0   && <div className="flex justify-between"><span className="text-stone-400">Inmune Estados</span><span className="font-semibold text-purple-300 text-xs text-right">{statusImmunities.join(', ')}</span></div>}
+                    {equipList && <div className="pt-1"><span className="text-stone-400">Equipo: </span><span className="text-stone-200 text-xs">{equipList}</span></div>}
+                  </div>
+                </div>
+              </div>
+
+              <div className="w-full md:w-2/3 p-5">
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-xl font-semibold text-amber-500 mb-3 pb-1 border-b border-stone-700 font-display tracking-wider">Acciones</h3>
+                    {finalAttacks.length > 0
+                      ? <ul className="space-y-3">{finalAttacks.map((attack, i) => { const ab = creature.attributes[attack.attribute] || 0; const tm = ab + attack.damageModifier; const ms = tm === 0 ? '' : tm > 0 ? ` + ${tm}` : ` - ${Math.abs(tm)}`; return (<li key={i} className="bg-stone-800/40 p-3 rounded-md border-l-4 border-stone-600"><p><strong className="font-bold text-amber-400">{attack.name}.</strong> <em className="text-stone-500 text-sm">({attack.type})</em></p><p className="pl-2 mt-0.5 text-sm"><span className="font-mono font-bold text-lg text-stone-100">{fmtBonus(ab)}</span><span className="text-stone-400 ml-2">a golpear, Impacto: {attack.damageDice}{ms} {attack.damageType}.</span></p>{attack.description && <p className="pl-2 mt-1 text-xs text-stone-400">{attack.description}</p>}</li>); })}</ul>
+                      : <p className="text-stone-500 italic text-sm">No hay acciones de ataque definidas.</p>
+                    }
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold text-amber-500 mb-3 pb-1 border-b border-stone-700 font-display tracking-wider">Rasgos y Habilidades</h3>
+                    <ul className="space-y-1 text-sm list-inside">
+                      {!categoryTrait && otherTraits.length === 0 && <p className="text-stone-500 italic">Ningún rasgo añadido.</p>}
+                      {categoryTrait && <TraitItem trait={categoryTrait} count={1} />}
+                      {otherTraits.map(({ trait, count }) => <TraitItem key={trait.instanceId} trait={trait} count={count} />)}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 flex justify-center gap-4">
+            <button onClick={() => setExportOpen(true)} className="px-8 py-2.5 bg-lime-800 hover:bg-lime-700 text-stone-100 font-semibold rounded-lg shadow transition-all">{copyText}</button>
+            <button onClick={handleExportImage}          className="px-8 py-2.5 bg-sky-800 hover:bg-sky-700 text-stone-100 font-semibold rounded-lg shadow transition-all">{imgText}</button>
+          </div>
+        </>
+      );
+    };
+
+// ============================================================
+    // MAIN APP
+    // ============================================================
+    const App = () => {
+      const createCategoryTrait = useCallback((categoryKey, abilityIndex = 0, customAbility = null) => {
+        const cat = CATEGORY_MAP[categoryKey];
+        const ability = customAbility || cat.abilities[abilityIndex] || cat.abilities[0];
+        return {
+          name: ability.name, description: ability.description, cost: 0,
+          category: 'Control y Únicos', isCategoryAbility: true,
+          restriction: null, instanceId: `category-${categoryKey}`
+        };
+      }, []);
+
+      const getInitialCreature = useCallback(() => ({
+        name: 'Nueva Criatura', label: '', nd: '1', size: 'Mediano', category: 'Bestia',
+        categoryAbilityIndex: 0, categoryCustomAbility: null,
+        attributes: { cuerpo: 2, destreza: 2, aura: 2 },
+        traits: [createCategoryTrait('Bestia', 0, null)],
+        attacks: [{ name: 'Golpe', type: 'Melee', attribute: 'cuerpo', damageDice: '1d6', damageModifier: 0, damageType: 'Contundente', description: '' }],
+        natures: ['Brutalmente'],
+        equippedWeapons: [],
+      }), [createCategoryTrait]);
+
+      const [creature, setCreature]             = useState(getInitialCreature);
+      const [step, setStep]                     = useState(1);
+      const [savedCreatures, setSavedCreatures] = useState([]);
+
+      useEffect(() => {
+        try { const s = localStorage.getItem('pp2-creature-saves'); if (s) setSavedCreatures(JSON.parse(s)); } catch {}
+      }, []);
+
+      const updateSaved = (list) => {
+        setSavedCreatures(list);
+        try { localStorage.setItem('pp2-creature-saves', JSON.stringify(list)); } catch {}
+      };
+
+      const handleSave = () => setCreature(c => {
+        const toSave = { ...c };
+        let newList;
+        if (toSave.id) newList = savedCreatures.map(sc => sc.id === toSave.id ? toSave : sc);
+        else { toSave.id = generateUniqueId('creature'); newList = [...savedCreatures, toSave]; }
+        updateSaved(newList);
+        return toSave;
+      });
+
+      const handleLoad   = (id) => { const c = savedCreatures.find(c => c.id === id); if (c) { setCreature(c); setStep(6); } };
+      const handleDelete = (id) => { updateSaved(savedCreatures.filter(c => c.id !== id)); if (creature.id === id) { setCreature(getInitialCreature()); setStep(1); } };
+      const handleNew    = () => { setCreature(getInitialCreature()); setStep(1); };
+
+      const handleReset = () => setCreature(c => {
+        const defaults = ND_MAP[c.nd];
+        const catTrait = c.traits.find(t => t.isCategoryAbility);
+        return { ...c, attributes: { cuerpo: defaults.bonoBase, destreza: defaults.bonoBase, aura: defaults.bonoBase }, traits: catTrait ? [catTrait] : [] };
+      });
+
+      const handleCreatureChange = (key, value) => setCreature(prev => {
+        const next = { ...prev, [key]: value };
+        if (key === 'nd') {
+          const s = ND_MAP[value];
+          next.attributes = { cuerpo: s.bonoBase, destreza: s.bonoBase, aura: s.bonoBase };
+          next.traits = prev.traits.filter(t => t.name !== 'Mejora de Atributo' && t.name !== 'Deficiencia de Atributo');
+        }
+        if (key === 'category') {
+          next.categoryAbilityIndex = 0;
+          next.categoryCustomAbility = null;
+          const newCat = createCategoryTrait(value, 0, null);
+          next.traits = [...prev.traits.filter(t => !t.isCategoryAbility), newCat];
+        }
+        return next;
+      });
+
+      const handleAttrChange = (attr, delta) => setCreature(prev => {
+        const newVal = prev.attributes[attr] + delta;
+        if (newVal < -3) return prev;
+        const mejora = ALL_TRAITS.find(t => t.name === 'Mejora de Atributo');
+        const defic  = ALL_TRAITS.find(t => t.name === 'Deficiencia de Atributo');
+        if (!mejora || !defic) return prev;
+        const newCreature = { ...prev, attributes: { ...prev.attributes }, traits: [...prev.traits] };
+        if (delta === 1) {
+          const di = newCreature.traits.findIndex(t => t.name === 'Deficiencia de Atributo' && t.appliedData?.attribute === attr);
+          if (di > -1) newCreature.traits.splice(di, 1);
+          else newCreature.traits.push({ ...mejora, appliedData: { attribute: attr }, instanceId: generateUniqueId('trait') });
+        } else {
+          const mi = newCreature.traits.findIndex(t => t.name === 'Mejora de Atributo' && t.appliedData?.attribute === attr);
+          if (mi > -1) newCreature.traits.splice(mi, 1);
+          else newCreature.traits.push({ ...defic, appliedData: { attribute: attr }, instanceId: generateUniqueId('trait') });
+        }
+        newCreature.attributes[attr] = newVal;
+        if (attr === 'cuerpo') {
+          if (newCreature.equippedArmor  && newVal < newCreature.equippedArmor.armor.cuerpoRequirement)   newCreature.equippedArmor  = undefined;
+          if (newCreature.equippedShield && newVal < newCreature.equippedShield.shield.cuerpoRequirement) newCreature.equippedShield = undefined;
+        }
+        return newCreature;
+      });
+
+      const handleAddWeapon    = (name)        => { const w = WEAPON_MAP[name]; if (w) setCreature(p => ({ ...p, equippedWeapons: [...p.equippedWeapons, { weapon: w, bonus: 0 }] })); };
+      const handleRemoveWeapon = (i)            => setCreature(p => ({ ...p, equippedWeapons: p.equippedWeapons.filter((_, idx) => idx !== i) }));
+      const handleWeaponBonus  = (i, bonus)     => setCreature(p => { const w = [...p.equippedWeapons]; w[i] = { ...w[i], bonus }; return { ...p, equippedWeapons: w }; });
+      const handleArmorShield  = (type, name)   => setCreature(p => {
+        const nc = { ...p };
+        if (name === 'Ninguno') { if (type === 'armor') nc.equippedArmor = undefined; else nc.equippedShield = undefined; }
+        else { if (type === 'armor') nc.equippedArmor = { armor: ARMOR_MAP[name], bonus: 0 }; else nc.equippedShield = { shield: SHIELD_MAP[name], bonus: 0 }; }
+        return nc;
+      });
+      const handleEquipBonus   = (type, bonus)  => setCreature(p => {
+        if (type === 'armor'  && p.equippedArmor)  return { ...p, equippedArmor:  { ...p.equippedArmor,  bonus } };
+        if (type === 'shield' && p.equippedShield) return { ...p, equippedShield: { ...p.equippedShield, bonus } };
+        return p;
+      });
+
+      const addTrait = (trait) => {
+        if (trait.name === 'Proyectil' || trait.name === 'Proyectil Superior') {
+          const base = ND_MAP[creature.nd];
+          const diceMatch = base.danoBase.match(/(\d+d\d+)/);
+          const modMatch  = base.danoBase.match(/([+-])\s*(\d+)/);
+          const damageDice = diceMatch ? diceMatch[0] : '1d6';
+          const damageModifier = modMatch ? (modMatch[1] === '+' ? parseInt(modMatch[2]) : -parseInt(modMatch[2])) : 0;
+          const range = trait.name === 'Proyectil' ? '15/20' : '20/40';
+          const newAttack = {
+            name: trait.name, type: 'Ranged', attribute: 'destreza',
+            damageDice, damageModifier, damageType: 'Contundente',
+            description: `Ataque a distancia con rango ${range}m.`, range
+          };
+          setCreature(p => ({
+            ...p,
+            traits:  [...p.traits,  { ...trait, instanceId: generateUniqueId('trait') }],
+            attacks: [...p.attacks, newAttack]
+          }));
+        } else {
+          setCreature(p => ({ ...p, traits: [...p.traits, { ...trait, instanceId: generateUniqueId('trait') }] }));
+        }
+      };
+
+      const removeTrait    = (instanceId) => setCreature(p => ({ ...p, traits: p.traits.filter(t => t.instanceId !== instanceId) }));
+      const addAttack      = (attack)     => setCreature(p => ({ ...p, attacks: [...p.attacks, attack] }));
+      const removeAttack   = (i)          => setCreature(p => ({ ...p, attacks: p.attacks.filter((_, idx) => idx !== i) }));
+      const reorderAttacks = (from, to)   => setCreature(p => { const a = [...p.attacks]; const [item] = a.splice(from, 1); a.splice(to, 0, item); return { ...p, attacks: a }; });
+
+      const inputCls = "w-full bg-stone-700 border border-stone-600 rounded-md py-2 px-3 text-stone-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-600";
+      const labelCls = "block text-sm font-medium text-stone-300 mb-1";
+
+      const renderStep = () => {
+        switch (step) {
+          case 1: return (
+            <div className="space-y-6 animate-fade-in">
+              <h2 className="text-2xl font-bold text-amber-500 font-display">Paso 1: Concepto y Nivel de Desafío</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div><label className={labelCls}>Nombre de la Criatura</label><input type="text" value={creature.name} onChange={e => handleCreatureChange('name', e.target.value)} className={inputCls}/></div>
+                <div><label className={labelCls}>Nivel de Desafío (ND)</label><select value={creature.nd} onChange={e => handleCreatureChange('nd', e.target.value)} className={inputCls}>{CHALLENGE_RATINGS.map(cr => <option key={cr.nd} value={cr.nd}>{cr.nd}</option>)}</select></div>
+                <div><label className={labelCls}>Tamaño</label><select value={creature.size} onChange={e => handleCreatureChange('size', e.target.value)} className={inputCls}>{SIZES.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}</select></div>
+                <div><label className={labelCls}>Naturaleza Inicial</label><select value={creature.natures[0]} onChange={e => handleCreatureChange('natures', [e.target.value])} className={inputCls}>{NATURES.map(n => <option key={n} value={n}>{n}</option>)}</select></div>
+                <div><label className={labelCls}>Categoría</label><select value={creature.category} onChange={e => handleCreatureChange('category', e.target.value)} className={inputCls}>{CATEGORIES.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}</select></div>
+                <div><label className={labelCls}>Etiqueta <span className="text-xs text-stone-500">(Opcional)</span></label><input type="text" value={creature.label || ''} onChange={e => handleCreatureChange('label', e.target.value)} placeholder="Ej: No-Muerto, Golem..." className={inputCls}/></div>
+              </div>
+
+              <div className="p-4 bg-stone-900/50 rounded-lg border border-amber-900/40 space-y-3">
+                <h3 className="font-semibold text-amber-400 font-display">Habilidad de Categoría: {creature.category}</h3>
+                <p className="text-xs text-stone-500">Elige una de las tres opciones o escribe la tuya propia.</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  {CATEGORY_MAP[creature.category].abilities.map((ab, idx) => {
+                    const isSelected = !creature.categoryCustomAbility && creature.categoryAbilityIndex === idx;
+                    return (
+                      <button key={idx} onClick={() => {
+                        const newTrait = createCategoryTrait(creature.category, idx, null);
+                        setCreature(c => ({ ...c, categoryAbilityIndex: idx, categoryCustomAbility: null, traits: [...c.traits.filter(t => !t.isCategoryAbility), newTrait] }));
+                      }} className={`text-left p-3 rounded-lg border transition-all ${isSelected ? 'border-amber-500 bg-amber-900/30 text-amber-200' : 'border-stone-700 bg-stone-900 text-stone-300 hover:border-amber-700'}`}>
+                        <div className="font-semibold text-sm mb-1">{ab.name}</div>
+                        <div className="text-xs text-stone-400 leading-snug">{ab.description}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="pt-1">
+                  <button onClick={() => {
+                    if (!creature.categoryCustomAbility) {
+                      setCreature(c => ({ ...c, categoryCustomAbility: { name: '', description: '' }, categoryAbilityIndex: -1 }));
+                    }
+                  }} className={`text-xs px-3 py-1 rounded border transition-all ${creature.categoryCustomAbility ? 'border-amber-500 text-amber-400' : 'border-stone-600 text-stone-400 hover:border-amber-700 hover:text-amber-400'}`}>
+                    {creature.categoryCustomAbility ? '✎ Editando habilidad personalizada' : '+ Escribir habilidad propia'}
+                  </button>
+                  {creature.categoryCustomAbility && (
+                    <div className="mt-2 space-y-2">
+                      <input type="text" placeholder="Nombre de la habilidad..." value={creature.categoryCustomAbility.name}
+                        onChange={e => {
+                          const updated = { ...creature.categoryCustomAbility, name: e.target.value };
+                          const newTrait = createCategoryTrait(creature.category, -1, updated);
+                          setCreature(c => ({ ...c, categoryCustomAbility: updated, traits: [...c.traits.filter(t => !t.isCategoryAbility), newTrait] }));
+                        }}
+                        className="w-full bg-stone-800 border border-stone-600 rounded px-3 py-1.5 text-sm text-stone-200 focus:border-amber-500 focus:outline-none"/>
+                      <textarea placeholder="Descripción del efecto..." value={creature.categoryCustomAbility.description} rows={2}
+                        onChange={e => {
+                          const updated = { ...creature.categoryCustomAbility, description: e.target.value };
+                          const newTrait = createCategoryTrait(creature.category, -1, updated);
+                          setCreature(c => ({ ...c, categoryCustomAbility: updated, traits: [...c.traits.filter(t => !t.isCategoryAbility), newTrait] }));
+                        }}
+                        className="w-full bg-stone-800 border border-stone-600 rounded px-3 py-1.5 text-sm text-stone-200 focus:border-amber-500 focus:outline-none resize-none"/>
+                      <button onClick={() => {
+                        const newTrait = createCategoryTrait(creature.category, 0, null);
+                        setCreature(c => ({ ...c, categoryCustomAbility: null, categoryAbilityIndex: 0, traits: [...c.traits.filter(t => !t.isCategoryAbility), newTrait] }));
+                      }} className="text-xs text-stone-500 hover:text-red-400 transition-colors">✕ Cancelar personalizada</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+
+          case 2: return (
+            <div className="animate-fade-in">
+              <h2 className="text-2xl font-bold text-amber-500 mb-6 font-display">Paso 2: Atributos</h2>
+              <AttributeEditor creature={creature} onAttributeChange={handleAttrChange} onReset={handleReset}/>
+            </div>
+          );
+
+          case 3: return (
+            <div className="animate-fade-in">
+              <h2 className="text-2xl font-bold text-amber-500 mb-6 font-display">Paso 3: Personalización (Rasgos)</h2>
+              <TraitSelector creature={creature} addTrait={addTrait} removeTrait={removeTrait}/>
+            </div>
+          );
+
+          case 4: return (
+            <div className="animate-fade-in">
+              <h2 className="text-2xl font-bold text-amber-500 mb-6 font-display">Paso 4: Equipamiento</h2>
+              <EquipmentSelector creature={creature} onAddWeapon={handleAddWeapon} onRemoveWeapon={handleRemoveWeapon} onWeaponBonusChange={handleWeaponBonus} onArmorShieldChange={handleArmorShield} onEquipmentBonusChange={handleEquipBonus}/>
+            </div>
+          );
+
+          case 5: return (
+            <div className="animate-fade-in">
+              <h2 className="text-2xl font-bold text-amber-500 mb-6 font-display">Paso 5: Ataques y Acciones</h2>
+              <ActionEditor creature={creature} addAttack={addAttack} removeAttack={removeAttack} reorderAttacks={reorderAttacks}/>
+            </div>
+          );
+
+          case 6: return (
+            <div className="animate-fade-in">
+              <h2 className="text-2xl font-bold text-amber-500 mb-6 font-display">Ficha de Criatura Completa</h2>
+              <CreatureSheet creature={creature}/>
+            </div>
+          );
+
+          default: return null;
+        }
+      };
+
+      return (
+        <div className="container mx-auto p-4 md:p-8 max-w-6xl">
+          <header className="text-center mb-8">
+            <div className="inline-block">
+              <h1 className="text-4xl md:text-5xl font-bold text-stone-100 font-display tracking-wide">
+                Creador de Criaturas <span className="text-amber-500">PP2</span>
+              </h1>
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent to-amber-900/60"></div>
+                <p className="text-stone-400 text-sm px-3">Una herramienta para dar vida a tus adversarios</p>
+                <div className="h-px flex-1 bg-gradient-to-l from-transparent to-amber-900/60"></div>
+              </div>
+            </div>
+          </header>
+
+          <div className="flex justify-center mb-6">
+            <SaveLoadManager creature={creature} savedCreatures={savedCreatures} onSave={handleSave} onLoad={handleLoad} onDelete={handleDelete} onNew={handleNew}/>
+          </div>
+
+          <StepNavigator currentStep={step} onStepClick={setStep}/>
+
+          <div className="bg-stone-800/80 border border-stone-700 rounded-xl shadow-2xl p-5 md:p-8 min-h-96 backdrop-blur-sm">
+            {renderStep()}
+          </div>
+
+          <footer className="mt-6 flex justify-between items-center">
+            <button onClick={() => setStep(s => Math.max(1, s-1))} disabled={step === 1} className="px-6 py-2.5 bg-stone-700 hover:bg-stone-600 text-stone-100 font-semibold rounded-lg shadow disabled:opacity-40 disabled:cursor-not-allowed transition-colors">← Anterior</button>
+            {step === 6
+              ? <button onClick={handleNew} className="px-6 py-2.5 bg-amber-700 hover:bg-amber-600 text-stone-100 font-semibold rounded-lg shadow transition-colors">Empezar de Nuevo</button>
+              : <button onClick={() => setStep(s => Math.min(6, s+1))} className="px-6 py-2.5 bg-amber-700 hover:bg-amber-600 text-stone-100 font-semibold rounded-lg shadow transition-colors">Siguiente →</button>
+            }
+          </footer>
+
+          <p className="text-center text-stone-600 text-xs mt-6">Las criaturas se guardan automáticamente en este navegador.</p>
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App/>);
+  </script>
+</body>
+</html>
